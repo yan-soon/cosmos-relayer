@@ -18,20 +18,27 @@
 package service
 
 import (
+	c "context"
 	"encoding/hex"
 	"fmt"
-	"github.com/cosmos/cosmos-sdk/types"
-	"github.com/ontio/ontology/common"
-	"github.com/ontio/ontology/smartcontract/service/native/utils"
-	"github.com/polynetwork/cosmos-poly-module/headersync"
-	"github.com/polynetwork/cosmos-relayer/context"
-	"github.com/polynetwork/poly-go-sdk"
-	"github.com/polynetwork/poly/native/service/header_sync/cosmos"
-	"github.com/stretchr/testify/assert"
 	"math"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/ontio/ontology/common"
+	"github.com/ontio/ontology/smartcontract/service/native/utils"
+	polysdk "github.com/polynetwork/poly-go-sdk"
+	hscosmos "github.com/polynetwork/poly/native/service/header_sync/cosmos"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/types/tx"
+
+	headersynctypes "github.com/Switcheo/polynetwork-cosmos/x/headersync/types"
+
+	"github.com/polynetwork/cosmos-relayer/context"
 )
 
 func TestTOCosmosRoutine(t *testing.T) {
@@ -40,26 +47,26 @@ func TestTOCosmosRoutine(t *testing.T) {
 
 	err = context.InitCtx(conf)
 	assert.NoError(t, err)
-	//acc, _ := types.AccAddressFromBech32("cosmos1cewy8pjuz7f42j582p7emzry0g3xrl0xd9f038")
-	//transfer := bank.MsgSend{FromAddress: ctx.CMAcc, ToAddress: acc,
-	//	Amount: types.NewCoins(types.NewCoin("stake", types.NewInt(1)))}
+	//acc, _ := sdk.AccAddressFromBech32("cosmos1cewy8pjuz7f42j582p7emzry0g3xrl0xd9f038")
+	//transfer := bank.MsgSend{FromAddress: ctx.Cosmos.Address, ToAddress: acc,
+	//	Amount: sdk.NewCoins(sdk.NewCoin("stake", sdk.NewInt(1)))}
 
-	//res, err := sendCosmosTx([]types.Msg{msg})
+	//res, err := sendCosmosTx([]sdk.Msg{msg})
 	//assert.NoError(t, err)
 	//fmt.Println(res.Hash.String())
 	//param := crosschain.NewQueryCurrentHeightParams(0)
-	//data, err := ctx.CMCdc.MarshalJSON(param)
+	//data, err := ctx.Cosmos.Cdc.MarshalJSON(param)
 	//assert.NoError(t, err)
 	//
-	//curr, err := ctx.CMRpcCli.ABCIQuery(QUERY_CURRENT_PATH, data)
+	//curr, err := ctx.Cosmos.RpcClient.ABCIQuery(QUERY_CURRENT_PATH, data)
 	//assert.NoError(t, err)
 	//currHeight := uint32(0)
-	//if err = ctx.CMCdc.UnmarshalJSON(curr.Response.Value, &currHeight); err != nil {
+	//if err = ctx.Cosmos.Cdc.UnmarshalJSON(curr.Response.Value, &currHeight); err != nil {
 	//	t.Fatal(err)
 	//}
 	//fmt.Println(currHeight)
 	//txhash, _ := hex.DecodeString("7DEB525706C0B1E5E4351EA9540B8156611D203550AEE35D08FDB915B185F719")
-	//tx, err := ctx.CMRpcCli.Tx(txhash, true)
+	//tx, err := ctx.Cosmos.RpcClient.Tx(txhash, true)
 	//if err != nil {
 	//	t.Fatal(err)
 	//}
@@ -71,7 +78,7 @@ func TestTOCosmosRoutine(t *testing.T) {
 	//	fmt.Println("---------------------------------------")
 	//}
 	//
-	//status, err := ctx.CMRpcCli.Status()
+	//status, err := ctx.Cosmos.RpcClient.Status()
 	//if err != nil {
 	//	t.Fatal(err)
 	//}
@@ -81,7 +88,7 @@ func TestTOCosmosRoutine(t *testing.T) {
 	//	t.Fatal(err)
 	//}
 	//fmt.Println(status.SyncInfo.LatestBlockHeight, tx.Height)
-	//res, err := ctx.CMRpcCli.ABCIQueryWithOptions(ProofPath, append(crosschain.CrossChainTxDetailPrefix, hash...),
+	//res, err := ctx.Cosmos.RpcClient.ABCIQueryWithOptions(ProofPath, append(crosschain.CrossChainTxDetailPrefix, hash...),
 	//	client.ABCIQueryOptions{Prove: true, Height: status.SyncInfo.LatestBlockHeight - 1})
 	//if err != nil {
 	//	t.Fatal(err)
@@ -98,7 +105,7 @@ func TestTOCosmosRoutine(t *testing.T) {
 	//kp = kp.AppendKey(res.Response.Key, merkle.KeyEncodingURL)
 	//
 	//h := res.Response.Height + 1
-	//rb, err := ctx.CMRpcCli.Block(&h)
+	//rb, err := ctx.Cosmos.RpcClient.Block(&h)
 	//if err != nil {
 	//	t.Fatal(err)
 	//}
@@ -107,36 +114,36 @@ func TestTOCosmosRoutine(t *testing.T) {
 	//if err != nil {
 	//	t.Fatal(err)
 	//}
-	//fmt.Println(ctx.CMAcc.String())
+	//fmt.Println(ctx.Cosmos.Address.String())
 	//fmt.Println(utils.OntContractAddress.ToHexString())
 	//
-	//status, _ := ctx.CMRpcCli.Status()
+	//status, _ := ctx.Cosmos.RpcClient.Status()
 	//fmt.Println(status.SyncInfo.LatestBlockHeight)
 	//
-	//bp := bank.NewQueryBalanceParams(ctx.CMAcc)
-	//raw, err := ctx.CMCdc.MarshalJSON(bp)
+	//bp := bank.NewQueryBalanceParams(ctx.Cosmos.Address)
+	//raw, err := ctx.Cosmos.Cdc.MarshalJSON(bp)
 	//if err != nil {
 	//	t.Fatal(err)
 	//}
-	//res, err := ctx.CMRpcCli.ABCIQueryWithOptions("/custom/bank/balances", raw, client.ABCIQueryOptions{Prove: true, Height: status.SyncInfo.LatestBlockHeight - 1})
+	//res, err := ctx.Cosmos.RpcClient.ABCIQueryWithOptions("/custom/bank/balances", raw, client.ABCIQueryOptions{Prove: true, Height: status.SyncInfo.LatestBlockHeight - 1})
 	//if err != nil {
 	//	t.Fatal(err)
 	//}
 	//fmt.Println(res.Response.Value, res.Response.Proof)
 	//
-	//p := auth.NewQueryAccountParams(ctx.CMAcc)
-	//raw, err = ctx.CMCdc.MarshalJSON(p)
+	//p := auth.NewQueryAccountParams(ctx.Cosmos.Address)
+	//raw, err = ctx.Cosmos.Cdc.MarshalJSON(p)
 	//if err != nil {
 	//	t.Fatal(err)
 	//}
-	//s, _ := ctx.CMRpcCli.Status()
+	//s, _ := ctx.Cosmos.RpcClient.Status()
 	//hash, _ := hex.DecodeString("DD35F7A46E9090B9D193AE095B1F3A2B5085966A671ED0306CB94BE350935B80")
-	//res, err := ctx.CMRpcCli.ABCIQueryWithOptions("/store/ccm/key", ccm.GetCrossChainTxKey(hash), client.ABCIQueryOptions{Prove: true, Height: s.SyncInfo.LatestBlockHeight - 2})
+	//res, err := ctx.Cosmos.RpcClient.ABCIQueryWithOptions("/store/ccm/key", ccm.GetCrossChainTxKey(hash), client.ABCIQueryOptions{Prove: true, Height: s.SyncInfo.LatestBlockHeight - 2})
 	//if err != nil {
 	//	t.Fatal(err)
 	//}
 	//fmt.Println(hex.EncodeToString(res.Response.GetValue()))
-	//res, err := ctx.CMRpcCli.Status()
+	//res, err := ctx.Cosmos.RpcClient.Status()
 	//vals, err := getValidators(res.SyncInfo.LatestBlockHeight)
 	//if err != nil {
 	//	t.Fatal(err)
@@ -159,8 +166,8 @@ func TestTOCosmosRoutine(t *testing.T) {
 	//if err != nil {
 	//	t.Fatal(err)
 	//}
-	//var header cosmos.CosmosHeader
-	//err = ctx.CMCdc.UnmarshalBinaryBare(val, &header)
+	//var header hscosmos.CosmosHeader
+	//err = ctx.Cosmos.Cdc.UnmarshalBinaryBare(val, &header)
 	//if err != nil {
 	//	t.Fatal(err)
 	//}
@@ -176,7 +183,7 @@ func TestCommitGenesis(t *testing.T) {
 	//
 	// commit COSMOS genesis header to Poly
 	h := int64(1)
-	res, err := ctx.CMRpcCli.Commit(&h)
+	res, err := ctx.Cosmos.RpcClient.Commit(c.TODO(), &h)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,12 +191,12 @@ func TestCommitGenesis(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ch := &cosmos.CosmosHeader{
+	ch := &hscosmos.CosmosHeader{
 		Header:  *res.Header,
 		Commit:  res.Commit,
 		Valsets: vals,
 	}
-	raw, err := ctx.CMCdc.MarshalBinaryBare(ch)
+	raw, err := ctx.Cosmos.Cdc.MarshalBinaryBare(ch)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -201,7 +208,7 @@ func TestCommitGenesis(t *testing.T) {
 	wArr := strings.Split("/Users/zou/Desktop/work/跨链/poly-peers/wallet1.dat,/Users/zou/Desktop/work/跨链/poly-peers/wallet2.dat,/Users/zou/Desktop/work/跨链/poly-peers/wallet3.dat,/Users/zou/Desktop/work/跨链/poly-peers/wallet4.dat,/Users/zou/Desktop/work/跨链/poly-peers/wallet5.dat,/Users/zou/Desktop/work/跨链/poly-peers/wallet6.dat,/Users/zou/Desktop/work/跨链/poly-peers/wallet7.dat", ",")
 	pArr := strings.Split("4cUYqGj2yib718E7ZmGQc,4cUYqGj2yib718E7ZmGQc,4cUYqGj2yib718E7ZmGQc,4cUYqGj2yib718E7ZmGQc,4cUYqGj2yib718E7ZmGQc,4cUYqGj2yib718E7ZmGQc,4cUYqGj2yib718E7ZmGQc", ",")
 
-	accArr := make([]*poly_go_sdk.Account, len(wArr))
+	accArr := make([]*polysdk.Account, len(wArr))
 	for i, v := range wArr {
 		accArr[i], err = context.GetAccountByPassword(ctx.Poly, v, []byte(pArr[i]))
 		if err != nil {
@@ -226,11 +233,11 @@ func TestCommitGenesis(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	param := &headersync.MsgSyncGenesisParam{
-		Syncer:        context.RCtx.CMAcc,
+	param := &headersynctypes.MsgSyncGenesis{
+		Syncer:        context.RCtx.Cosmos.Address.String(),
 		GenesisHeader: hex.EncodeToString(hdr.ToArray()),
 	}
-	resTx, _, err := sendCosmosTx([]types.Msg{param})
+	resTx, _, err := sendCosmosTx([]sdk.Msg{param})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,30 +257,31 @@ func TestStartRelay(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	param := &headersync.MsgSyncGenesisParam{
-		Syncer:        ctx.CMAcc,
+	param := &headersynctypes.MsgSyncGenesis{
+		Syncer:        ctx.Cosmos.Address.String(),
 		GenesisHeader: hex.EncodeToString(header.ToArray()),
 	}
-	resTx, _, err := sendCosmosTx([]types.Msg{param})
+	resTx, _, err := sendCosmosTx([]sdk.Msg{param})
 	if err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(5 * time.Second)
 
-	res, err := ctx.CMRpcCli.Tx(resTx.Hash, true)
+	client := tx.NewServiceClient(ctx.Cosmos.GrpcConn)
+	res, err := client.GetTx(c.Background(), &tx.GetTxRequest{Hash: resTx.Hash.String()})
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println(res.Hash.String())
+	fmt.Println(res.TxResponse.TxHash)
 
-	fmt.Printf("res: %v", res.TxResult.Events)
+	fmt.Printf("res: %v", res.TxResponse.Logs)
 }
 
 func TestToCosmosRoutine(t *testing.T) {
-	//config := types.GetConfig()
-	//config.SetBech32PrefixForAccount(cmd.MainPrefix, cmd.MainPrefix+types.PrefixPublic)
-	//config.SetBech32PrefixForValidator(cmd.MainPrefix+types.PrefixValidator+types.PrefixOperator, cmd.MainPrefix+types.PrefixValidator+types.PrefixOperator+types.PrefixPublic)
-	//config.SetBech32PrefixForConsensusNode(cmd.MainPrefix+types.PrefixValidator+types.PrefixConsensus, cmd.MainPrefix+types.PrefixValidator+types.PrefixConsensus+types.PrefixPublic)
+	//config := sdk.GetConfig()
+	//config.SetBech32PrefixForAccount(cmd.MainPrefix, cmd.MainPrefix+sdk.PrefixPublic)
+	//config.SetBech32PrefixForValidator(cmd.MainPrefix+sdk.PrefixValidator+sdk.PrefixOperator, cmd.MainPrefix+sdk.PrefixValidator+sdk.PrefixOperator+sdk.PrefixPublic)
+	//config.SetBech32PrefixForConsensusNode(cmd.MainPrefix+sdk.PrefixValidator+sdk.PrefixConsensus, cmd.MainPrefix+sdk.PrefixValidator+sdk.PrefixConsensus+sdk.PrefixPublic)
 	//config.Seal()
 	//_, acc, err := context.GetCosmosPrivateKey("/Users/zou/go/src/github.com/polynetwork/cosmos-relayer/cosmos_key", []byte("12345678"))
 	//if err != nil {

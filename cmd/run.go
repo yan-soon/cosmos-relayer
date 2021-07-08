@@ -20,11 +20,12 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
+
 	"github.com/polynetwork/cosmos-relayer/context"
 	"github.com/polynetwork/cosmos-relayer/log"
 	"github.com/polynetwork/cosmos-relayer/service"
 	"github.com/polynetwork/poly/common/password"
-	"os"
 )
 
 var (
@@ -84,7 +85,7 @@ func main() {
 		panic(err)
 	}
 
-	log.Infof("using acc: (cosmos: %s, poly: %s)", context.RCtx.CMAcc.String(), context.RCtx.PolyAcc.Address.ToBase58())
+	log.Infof("using acc: (cosmos: %s, poly: %s)", context.RCtx.Cosmos.Address.String(), context.RCtx.PolyAcc.Address.ToBase58())
 
 	// start two services.
 	// listen service try to find cross-chain txs and headers.

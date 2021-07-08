@@ -19,24 +19,28 @@ package service
 
 import (
 	"bytes"
+	c "context"
 	"encoding/hex"
 	"fmt"
-	"github.com/polynetwork/cosmos-poly-module/ccm"
-	"github.com/polynetwork/cosmos-poly-module/headersync"
-	"github.com/polynetwork/cosmos-relayer/context"
-	"github.com/polynetwork/cosmos-relayer/log"
-	"github.com/polynetwork/poly/common"
-	ccmc "github.com/polynetwork/poly/native/service/cross_chain_manager/common"
-	ccm_cosmos "github.com/polynetwork/poly/native/service/cross_chain_manager/cosmos"
-	mhcomm "github.com/polynetwork/poly/native/service/header_sync/common"
-	"github.com/polynetwork/poly/native/service/header_sync/cosmos"
-	"github.com/polynetwork/poly/native/service/utils"
-	"github.com/tendermint/tendermint/crypto/merkle"
-	"github.com/tendermint/tendermint/rpc/client"
-	"github.com/tendermint/tendermint/rpc/core/types"
-	tdmt_types "github.com/tendermint/tendermint/types"
 	"strings"
 	"time"
+
+	"github.com/polynetwork/cosmos-relayer/context"
+	"github.com/polynetwork/cosmos-relayer/log"
+	polycommon "github.com/polynetwork/poly/common"
+	ccmcommon "github.com/polynetwork/poly/native/service/cross_chain_manager/common"
+	ccmcosmos "github.com/polynetwork/poly/native/service/cross_chain_manager/cosmos"
+	hscommon "github.com/polynetwork/poly/native/service/header_sync/common"
+	hscosmos "github.com/polynetwork/poly/native/service/header_sync/cosmos"
+	"github.com/polynetwork/poly/native/service/utils"
+
+	"github.com/tendermint/tendermint/abci/types"
+	"github.com/tendermint/tendermint/crypto/merkle"
+	coretypes "github.com/tendermint/tendermint/rpc/core/types"
+	tmtypes "github.com/tendermint/tendermint/types"
+
+	ccmkeeper "github.com/Switcheo/polynetwork-cosmos/x/ccm/keeper"
+	headersynctypes "github.com/Switcheo/polynetwork-cosmos/x/headersync/types"
 )
 
 var (
@@ -176,15 +180,21 @@ func checkPolyHeight(h, epochHeight uint32) (int, error) {
 				proof, _ := ctx.Poly.GetCrossStatesProof(h-1, states[5].(string)) // TODO: log
 				rawProof, _ := hex.DecodeString(proof.AuditPath)
 
-				src := common.NewZeroCopySource(rawProof)
+				src := polycommon.NewZeroCopySource(rawProof)
 				val, _ := src.NextVarBytes()
-				merkleValue := new(ccmc.ToMerkleValue)
-				_ = merkleValue.Deserialization(common.NewZeroCopySource(val))
+				merkleValue := new(ccmcommon.ToMerkleValue)
+				_ = merkleValue.Deserialization(polycommon.NewZeroCopySource(val))
 
 				// check if this cross-chain tx already committed on COSMOS
-				res, err := ctx.CMRpcCli.ABCIQuery(context.ProofPath, ccm.GetDoneTxKey(merkleValue.FromChainID,
-					merkleValue.MakeTxParam.CrossChainID))
-				if err != nil || res == nil || res.Response.GetValue() != nil {
+				key := ccmkeeper.GetDoneTxKey(merkleValue.FromChainID, merkleValue.MakeTxParam.CrossChainID)
+				res, err := ctx.Cosmos.GrpcClient.QuerySync(types.RequestQuery{
+					Data: key,
+					Path: context.ProofPath,
+				})
+				if err != nil {
+					panic(err)
+				}
+				if res.GetValue() != nil {
 					continue
 				}
 
@@ -195,7 +205,7 @@ func checkPolyHeight(h, epochHeight uint32) (int, error) {
 						Height:      h - 1,
 						Proof:       hex.EncodeToString(rawProof),
 						TxHash:      e.TxHash,
-						IsEpoch:     header.NextBookkeeper != common.ADDRESS_EMPTY,
+						IsEpoch:     header.NextBookkeeper != polycommon.ADDRESS_EMPTY,
 						CCID:        merkleValue.MakeTxParam.CrossChainID,
 						FromChainId: merkleValue.FromChainID,
 					},
@@ -208,7 +218,7 @@ func checkPolyHeight(h, epochHeight uint32) (int, error) {
 	}
 
 	// send header if consensus period changed and no cross-chain tx found
-	if header.NextBookkeeper != common.ADDRESS_EMPTY && cnt == 0 && h > epochHeight {
+	if header.NextBookkeeper != polycommon.ADDRESS_EMPTY && cnt == 0 && h > epochHeight {
 		ctx.ToCosmos <- &context.PolyInfo{
 			Type: context.TyHeader,
 			Hdr:  header,
@@ -278,16 +288,16 @@ func CosmosListen() {
 	for {
 		select {
 		case <-tick.C:
-			status, err := ctx.CMRpcCli.Status()
+			info, err := ctx.Cosmos.GrpcClient.InfoSync(types.RequestInfo{})
 			switch {
 			case err != nil:
 				log.Errorf("[ListenCosmos] failed to get height of COSMOS, retry after %d sec: %v",
 					ctx.Conf.CosmosListenInterval, err)
 				continue
-			case status.SyncInfo.LatestBlockHeight-1 <= lastRight:
+			case info.LastBlockHeight-1 <= lastRight:
 				continue
 			}
-			right := status.SyncInfo.LatestBlockHeight - 1
+			right := info.LastBlockHeight - 1
 			hdr, err := getCosmosHdr(right)
 			if err != nil {
 				log.Errorf("[ListenCosmos] failed to get %d header to get proof, retry after %d sec: %v",
@@ -304,7 +314,7 @@ func CosmosListen() {
 			infoArr := make([]*context.CosmosInfo, 1)
 			infoArr[0] = &context.CosmosInfo{
 				Type: context.TyHeader,
-				Hdrs: make([]*cosmos.CosmosHeader, 0),
+				Hdrs: make([]*hscosmos.CosmosHeader, 0),
 			}
 			for h := left + 1; h <= right; h++ {
 				infoArrTemp, err := checkCosmosHeight(h, hdr, infoArr, &right)
@@ -354,12 +364,12 @@ func CosmosListen() {
 // Prepare start height and ticker when init service
 func beforeCosmosListen() (int64, *time.Ticker, error) {
 	val, err := ctx.Poly.GetStorage(utils.HeaderSyncContractAddress.ToHexString(),
-		append([]byte(mhcomm.EPOCH_SWITCH), utils.GetUint64Bytes(ctx.Conf.SideChainId)...))
+		append([]byte(hscommon.EPOCH_SWITCH), utils.GetUint64Bytes(ctx.Conf.SideChainId)...))
 	if err != nil {
 		return 0, nil, err
 	}
-	info := &cosmos.CosmosEpochSwitchInfo{}
-	if err = info.Deserialization(common.NewZeroCopySource(val)); err != nil {
+	info := &hscosmos.CosmosEpochSwitchInfo{}
+	if err = info.Deserialization(polycommon.NewZeroCopySource(val)); err != nil {
 		return 0, nil, err
 	}
 	currHeight := info.Height
@@ -382,14 +392,17 @@ func beforeCosmosListen() (int64, *time.Ticker, error) {
 // Put header to `hdrArr` and txs to `txArr`. Get proof from height `heightToGetProof`.
 // `headersToRelay` record all hdrs need to relay. When need to update new height to
 // get proof, relayer update `rightPtr` and return.
-func checkCosmosHeight(h int64, hdrToVerifyProof *cosmos.CosmosHeader, infoArr []*context.CosmosInfo, rightPtr *int64) ([]*context.CosmosInfo, error) {
+func checkCosmosHeight(h int64, hdrToVerifyProof *hscosmos.CosmosHeader, infoArr []*context.CosmosInfo, rightPtr *int64) ([]*context.CosmosInfo, error) {
 	query := getTxQuery(h - 1)
-	res, err := ctx.CMRpcCli.TxSearch(query, true, 1, context.PerPage, "asc")
+	var page, perPage *int
+	*page = 1
+	*perPage = context.PerPage
+	res, err := ctx.Cosmos.RpcClient.TxSearch(c.TODO(), query, true, page, perPage, "asc")
 	if err != nil {
 		return infoArr, err
 	}
 
-	rc, err := ctx.CMRpcCli.Commit(&h)
+	rc, err := ctx.Cosmos.RpcClient.Commit(c.TODO(), &h)
 	if err != nil {
 		return infoArr, err
 	}
@@ -398,13 +411,13 @@ func checkCosmosHeight(h int64, hdrToVerifyProof *cosmos.CosmosHeader, infoArr [
 		if err != nil {
 			return infoArr, err
 		}
-		hdr := &cosmos.CosmosHeader{
+		hdr := &hscosmos.CosmosHeader{
 			Header:  *rc.Header,
 			Commit:  rc.Commit,
 			Valsets: vSet,
 		}
 		val, _ := ctx.Poly.GetStorage(utils.CrossChainManagerContractAddress.ToHexString(),
-			append(append([]byte(mhcomm.EPOCH_SWITCH), utils.GetUint64Bytes(ctx.Conf.SideChainId)...),
+			append(append([]byte(hscommon.EPOCH_SWITCH), utils.GetUint64Bytes(ctx.Conf.SideChainId)...),
 				utils.GetUint64Bytes(uint64(h))...))
 		// check if this header is not committed on Poly
 		if val == nil || len(val) == 0 {
@@ -421,32 +434,39 @@ func checkCosmosHeight(h int64, hdrToVerifyProof *cosmos.CosmosHeader, infoArr [
 	for p := 1; p <= pages; p++ {
 		// already have page 1
 		if p > 1 {
-			if res, err = ctx.CMRpcCli.TxSearch(query, true, p, context.PerPage, "asc"); err != nil {
+			if res, err = ctx.Cosmos.RpcClient.TxSearch(c.TODO(), query, true, &p, perPage, "asc"); err != nil {
 				return infoArr, err
 			}
 		}
 		// get proof for every tx, and add them to txArr prepared to commit
 		for _, tx := range res.Txs {
 			hash := getKeyHash(tx)
-			res, _ := ctx.CMRpcCli.ABCIQueryWithOptions(context.ProofPath, ccm.GetCrossChainTxKey(hash),
-				client.ABCIQueryOptions{Prove: true, Height: heightToGetProof})
-			if res == nil || res.Response.GetValue() == nil {
+			res, err := ctx.Cosmos.GrpcClient.QuerySync(types.RequestQuery{
+				Data:   ccmkeeper.GetCrossChainTxKey(hash),
+				Path:   context.ProofPath,
+				Prove:  true,
+				Height: heightToGetProof,
+			})
+			if err != nil {
+				panic(err)
+			}
+			if res == nil || res.GetValue() == nil {
 				// If get the proof failed, that could means the header of height `heightToGetProof`
 				// is already pruned. And the cosmos node already delete the data on
 				// `heightToGetProof`. We need to update the height `right`, and check this height
 				// `h` again
 				for {
-					status, err := ctx.CMRpcCli.Status()
+					info, err := ctx.Cosmos.GrpcClient.InfoSync(types.RequestInfo{})
 					if err != nil {
 						log.Errorf("failed to get status and could be something wrong with RPC: %v", err)
 						continue
 					}
-					hdrToVerifyProof, err = getCosmosHdr(status.SyncInfo.LatestBlockHeight - 1)
+					hdrToVerifyProof, err = getCosmosHdr(info.LastBlockHeight - 1)
 					if err != nil {
 						log.Errorf("failed to get cosmos header info and could be something wrong with RPC: %v", err)
 						continue
 					}
-					*rightPtr = status.SyncInfo.LatestBlockHeight - 1
+					*rightPtr = info.LastBlockHeight - 1
 					if bytes.Equal(hdrToVerifyProof.Header.ValidatorsHash, hdrToVerifyProof.Header.NextValidatorsHash) {
 						break
 					}
@@ -454,25 +474,28 @@ func checkCosmosHeight(h int64, hdrToVerifyProof *cosmos.CosmosHeader, infoArr [
 				}
 				return infoArr, fmt.Errorf("%s from %d to %d", context.RightHeightUpdate, heightToGetProof+1, *rightPtr)
 			}
-			proof, _ := res.Response.Proof.Marshal()
+			proof, err := res.GetProofOps().Marshal()
+			if err != nil {
+				panic(err)
+			}
 
 			kp := merkle.KeyPath{}
 			kp = kp.AppendKey([]byte(context.CosmosCrossChainModName), merkle.KeyEncodingURL)
-			kp = kp.AppendKey(res.Response.Key, merkle.KeyEncodingURL)
-			pv, _ := ctx.CMCdc.MarshalBinaryBare(&ccm_cosmos.CosmosProofValue{
+			kp = kp.AppendKey(res.Key, merkle.KeyEncodingURL)
+			pv, _ := ctx.Cosmos.Cdc.MarshalBinaryBare(&ccmcosmos.CosmosProofValue{
 				Kp:    kp.String(),
-				Value: res.Response.GetValue(),
+				Value: res.GetValue(),
 			})
 
-			txParam := new(ccmc.MakeTxParam)
-			_ = txParam.Deserialization(common.NewZeroCopySource(res.Response.GetValue()))
+			txParam := new(ccmcommon.MakeTxParam)
+			_ = txParam.Deserialization(polycommon.NewZeroCopySource(res.GetValue()))
 
 			// check if this cross-chain tx already committed on Poly
 			// If we don't check, relayer will commit a new header to prove it.
 			// And in the end, that header is committed for nothing because this tx
 			// already committed
 			val, _ := ctx.Poly.GetStorage(utils.CrossChainManagerContractAddress.ToHexString(),
-				append(append([]byte(ccmc.DONE_TX), utils.GetUint64Bytes(ctx.Conf.SideChainId)...),
+				append(append([]byte(ccmcommon.DONE_TX), utils.GetUint64Bytes(ctx.Conf.SideChainId)...),
 					txParam.CrossChainID...))
 			if val != nil && len(val) != 0 {
 				continue
@@ -482,11 +505,11 @@ func checkCosmosHeight(h int64, hdrToVerifyProof *cosmos.CosmosHeader, infoArr [
 				Type: context.TyTx,
 				Tx: &context.CosmosTx{
 					Tx:          tx,
-					ProofHeight: res.Response.Height,
+					ProofHeight: res.Height,
 					Proof:       proof,
 					PVal:        pv,
 				},
-				Hdrs: []*cosmos.CosmosHeader{hdrToVerifyProof},
+				Hdrs: []*hscosmos.CosmosHeader{hdrToVerifyProof},
 			})
 		}
 	}
@@ -494,7 +517,7 @@ func checkCosmosHeight(h int64, hdrToVerifyProof *cosmos.CosmosHeader, infoArr [
 	return infoArr, nil
 }
 
-func reproveCosmosTx(infoArr []*context.CosmosInfo, hdrToVerifyProof *cosmos.CosmosHeader) []*context.CosmosInfo {
+func reproveCosmosTx(infoArr []*context.CosmosInfo, hdrToVerifyProof *hscosmos.CosmosHeader) []*context.CosmosInfo {
 	arr, err := ctx.Db.GetCosmosTxReproving()
 	if err != nil {
 		panic(fmt.Errorf("[ReProve] failed to get reproving cosmos tx: %v", err))
@@ -507,29 +530,36 @@ func reproveCosmosTx(infoArr []*context.CosmosInfo, hdrToVerifyProof *cosmos.Cos
 	for i := 0; i < len(arr); i++ {
 		tx := arr[i]
 		hash := getKeyHash(tx)
-		res, err := ctx.CMRpcCli.ABCIQueryWithOptions(context.ProofPath, ccm.GetCrossChainTxKey(hash),
-			client.ABCIQueryOptions{Prove: true, Height: hdrToVerifyProof.Header.Height - 1})
-		if err != nil || res == nil || res.Response.GetValue() == nil {
+		res, err := ctx.Cosmos.GrpcClient.QuerySync(types.RequestQuery{
+			Data:   ccmkeeper.GetCrossChainTxKey(hash),
+			Path:   context.ProofPath,
+			Prove:  true,
+			Height: hdrToVerifyProof.Header.Height - 1,
+		})
+		if err != nil || res == nil || res.GetValue() == nil {
 			log.Errorf("[ReProve] failed to query proof and could be something wrong with RPC: %v", err)
 			return infoArr
 		}
 
 		kp := merkle.KeyPath{}
 		kp = kp.AppendKey([]byte(context.CosmosCrossChainModName), merkle.KeyEncodingURL)
-		kp = kp.AppendKey(res.Response.Key, merkle.KeyEncodingURL)
-		pv, _ := ctx.CMCdc.MarshalBinaryBare(&ccm_cosmos.CosmosProofValue{
+		kp = kp.AppendKey(res.Key, merkle.KeyEncodingURL)
+		pv, _ := ctx.Cosmos.Cdc.MarshalBinaryBare(&ccmcosmos.CosmosProofValue{
 			Kp:    kp.String(),
-			Value: res.Response.GetValue(),
+			Value: res.GetValue(),
 		})
 
-		proof, _ := res.Response.GetProof().Marshal()
+		proof, err := res.GetProofOps().Marshal()
+		if err != nil {
+			panic(err)
+		}
 		log.Debugf("[ReProve] repove cosmos tx %s with height %d and header %d",
-			tx.Hash.String(), res.Response.Height, hdrToVerifyProof.Header.Height)
+			tx.Hash.String(), res.Height, hdrToVerifyProof.Header.Height)
 
-		txParam := new(ccmc.MakeTxParam)
-		_ = txParam.Deserialization(common.NewZeroCopySource(res.Response.GetValue()))
+		txParam := new(ccmcommon.MakeTxParam)
+		_ = txParam.Deserialization(polycommon.NewZeroCopySource(res.GetValue()))
 		val, _ := ctx.Poly.GetStorage(utils.CrossChainManagerContractAddress.ToHexString(),
-			append(append([]byte(ccmc.DONE_TX), utils.GetUint64Bytes(ctx.Conf.SideChainId)...),
+			append(append([]byte(ccmcommon.DONE_TX), utils.GetUint64Bytes(ctx.Conf.SideChainId)...),
 				txParam.CrossChainID...))
 		if val != nil && len(val) != 0 {
 			if err = ctx.Db.DelCosmosTxReproving(tx.Hash); err != nil {
@@ -541,11 +571,11 @@ func reproveCosmosTx(infoArr []*context.CosmosInfo, hdrToVerifyProof *cosmos.Cos
 			Type: context.TyTx,
 			Tx: &context.CosmosTx{
 				Tx:          tx,
-				ProofHeight: res.Response.Height,
+				ProofHeight: res.Height,
 				Proof:       proof,
 				PVal:        pv,
 			},
-			Hdrs: []*cosmos.CosmosHeader{hdrToVerifyProof},
+			Hdrs: []*hscosmos.CosmosHeader{hdrToVerifyProof},
 		})
 		ctx.Db.SetCosmosTxTxInChan(tx.Hash)
 	}
@@ -556,11 +586,12 @@ func getTxQuery(h int64) string {
 	return fmt.Sprintf("tx.height=%d AND make_from_cosmos_proof.status='1'", h)
 }
 
-func getValidators(h int64) ([]*tdmt_types.Validator, error) {
-	p := 1
-	vSet := make([]*tdmt_types.Validator, 0)
+func getValidators(h int64) ([]*tmtypes.Validator, error) {
+	page := 1
+	perPage := 100
+	vSet := make([]*tmtypes.Validator, 0)
 	for {
-		res, err := ctx.CMRpcCli.Validators(&h, p, 100)
+		res, err := ctx.Cosmos.RpcClient.Validators(c.TODO(), &h, &page, &perPage)
 		if err != nil {
 			if strings.Contains(err.Error(), "page should be within") {
 				return vSet, nil
@@ -572,12 +603,12 @@ func getValidators(h int64) ([]*tdmt_types.Validator, error) {
 			return vSet, nil
 		}
 		vSet = append(vSet, res.Validators...)
-		p++
+		page++
 	}
 }
 
-func getCosmosHdr(h int64) (*cosmos.CosmosHeader, error) {
-	rc, err := ctx.CMRpcCli.Commit(&h)
+func getCosmosHdr(h int64) (*hscosmos.CosmosHeader, error) {
+	rc, err := ctx.Cosmos.RpcClient.Commit(c.TODO(), &h)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Commit of height %d: %v", h, err)
 	}
@@ -585,36 +616,26 @@ func getCosmosHdr(h int64) (*cosmos.CosmosHeader, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Validators of height %d: %v", h, err)
 	}
-	return &cosmos.CosmosHeader{
+	return &hscosmos.CosmosHeader{
 		Header:  *rc.Header,
 		Commit:  rc.Commit,
 		Valsets: vSet,
 	}, nil
 }
 
-func getPolyEpochOnCosmos() (*headersync.ConsensusPeers, error) {
-	data, err := ctx.CMCdc.MarshalJSON(headersync.NewQueryConsensusPeersParams(ctx.Poly.ChainId))
+func getPolyEpochOnCosmos() (*headersynctypes.ConsensusPeers, error) {
+	client := headersynctypes.NewQueryClient(ctx.Cosmos.GrpcConn)
+	res, err := client.ConsensusPeers(c.Background(), &headersynctypes.QueryGetConsensusPeersRequest{ChainId: ctx.Poly.ChainId})
 	if err != nil {
 		return nil, err
 	}
-	res, err := ctx.CMRpcCli.ABCIQuery(context.QueryConsensusPath, data)
-	if err != nil {
-		return nil, err
-	}
-	if res == nil || len(res.Response.Value) == 0 {
-		return nil, fmt.Errorf("current height of Poly on COSMOS not set")
-	}
-	cps := &headersync.ConsensusPeers{}
-	if err = cps.Deserialization(common.NewZeroCopySource(res.Response.GetValue())); err != nil {
-		return nil, err
-	}
-	return cps, nil
+	return &res.ConsensusPeers, nil
 }
 
 func getKeyHash(tx *coretypes.ResultTx) []byte {
 	var hash []byte
 	for _, e := range tx.TxResult.Events {
-		if e.Type == context.CosmosProofKey {
+		if e.Type == context.CrossChainTxEvent {
 			hash, _ = hex.DecodeString(string(e.Attributes[2].Value))
 			break
 		}

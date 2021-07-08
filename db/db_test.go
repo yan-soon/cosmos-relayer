@@ -18,34 +18,26 @@
 package db
 
 import (
-	"github.com/cosmos/cosmos-sdk/codec"
-	"github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
-	"github.com/cosmos/cosmos-sdk/x/bank"
-	"github.com/polynetwork/cosmos-poly-module/btcx"
-	"github.com/polynetwork/cosmos-poly-module/ccm"
-	"github.com/polynetwork/cosmos-poly-module/ft"
-	"github.com/polynetwork/cosmos-poly-module/headersync"
-	"github.com/polynetwork/cosmos-poly-module/lockproxy"
-	pt "github.com/polynetwork/poly/core/types"
-	"github.com/stretchr/testify/assert"
-	types2 "github.com/tendermint/tendermint/abci/types"
-	"github.com/tendermint/tendermint/libs/kv"
-	"github.com/tendermint/tendermint/rpc/core/types"
 	"os"
 	"testing"
+
+	pt "github.com/polynetwork/poly/core/types"
+	"github.com/stretchr/testify/assert"
+	abcitypes "github.com/tendermint/tendermint/abci/types"
+	"github.com/tendermint/tendermint/libs/kv"
+	tmcoretypes "github.com/tendermint/tendermint/rpc/core/types"
 )
 
 var (
-	tx1 = &coretypes.ResultTx{
+	tx1 = &tmcoretypes.ResultTx{
 		Hash:   []byte{1},
 		Tx:     []byte{0},
 		Height: 100,
 		Index:  0,
-		TxResult: types2.ResponseDeliverTx{
+		TxResult: abcitypes.ResponseDeliverTx{
 			Log: "tx1",
-			Events: []types2.Event{
-				types2.Event{
+			Events: []abcitypes.Event{
+				abcitypes.Event{
 					Type: "gogogo",
 					Attributes: []kv.Pair{
 						kv.Pair{
@@ -57,7 +49,7 @@ var (
 			},
 		},
 	}
-	tx2 = &coretypes.ResultTx{
+	tx2 = &tmcoretypes.ResultTx{
 		Hash:   []byte{2},
 		Tx:     []byte{0},
 		Height: 100,
@@ -65,37 +57,21 @@ var (
 	}
 )
 
-func NewCodecForRelayer() *codec.Codec {
-	cdc := codec.New()
-	bank.RegisterCodec(cdc)
-	types.RegisterCodec(cdc)
-	codec.RegisterCrypto(cdc)
-	auth.RegisterCodec(cdc)
-	btcx.RegisterCodec(cdc)
-	ccm.RegisterCodec(cdc)
-	ft.RegisterCodec(cdc)
-	headersync.RegisterCodec(cdc)
-	lockproxy.RegisterCodec(cdc)
-
-	//cdc.RegisterConcrete(coretypes.ResultTx{}, "cosmos-relayer/ResultTx", nil)
-	return cdc
-}
-
 func TestNewDatabase(t *testing.T) {
-	_, err := NewDatabase("./", NewCodecForRelayer())
+	_, err := NewDatabase("./")
 	assert.NoError(t, err)
 
 	_ = os.RemoveAll("./db.bin")
 }
 
 func TestDatabase_SetCosmosTxReproving(t *testing.T) {
-	tx := &coretypes.ResultTx{
+	tx := &tmcoretypes.ResultTx{
 		Hash:   []byte{1, 1, 1, 1},
 		Tx:     []byte{0},
 		Height: 100,
 		Index:  0,
 	}
-	db, _ := NewDatabase("./", NewCodecForRelayer())
+	db, _ := NewDatabase("./")
 	err := db.SetCosmosTxReproving(tx)
 	assert.NoError(t, err)
 
@@ -105,7 +81,7 @@ func TestDatabase_SetCosmosTxReproving(t *testing.T) {
 func TestDatabase_GetCosmosTxReproving(t *testing.T) {
 	//defer os.RemoveAll("./db.bin")
 
-	db, _ := NewDatabase("./", NewCodecForRelayer())
+	db, _ := NewDatabase("./")
 
 	// save tx1 and get tx1
 	err := db.SetCosmosTxReproving(tx1)
@@ -144,7 +120,7 @@ func TestDatabase_GetCosmosTxReproving(t *testing.T) {
 func TestDatabase_DelCosmosTxReproving(t *testing.T) {
 	defer os.RemoveAll("./db.bin")
 
-	db, _ := NewDatabase("./", NewCodecForRelayer())
+	db, _ := NewDatabase("./")
 
 	_ = db.SetCosmosTxReproving(tx1)
 	db.SetCosmosTxTxInChan(tx1.Hash)
@@ -155,7 +131,7 @@ func TestDatabase_DelCosmosTxReproving(t *testing.T) {
 }
 
 func TestDatabase_SetPolyTxReproving(t *testing.T) {
-	db, _ := NewDatabase("./", NewCodecForRelayer())
+	db, _ := NewDatabase("./")
 	err := db.SetPolyTxReproving("1111", "2222", &pt.Header{
 		ChainID: 666,
 		Height:  666,
@@ -167,7 +143,7 @@ func TestDatabase_SetPolyTxReproving(t *testing.T) {
 func TestDatabase_GetPolyTxReproving(t *testing.T) {
 	defer os.RemoveAll("./db.bin")
 
-	db, _ := NewDatabase("./", NewCodecForRelayer())
+	db, _ := NewDatabase("./")
 	err := db.SetPolyTxReproving("1111", "2222", &pt.Header{
 		ChainID: 666,
 		Height:  666,
@@ -209,7 +185,7 @@ func TestDatabase_GetPolyTxReproving(t *testing.T) {
 func TestDatabase_DelPolyTxReproving(t *testing.T) {
 	defer os.RemoveAll("./db.bin")
 
-	db, _ := NewDatabase("./", NewCodecForRelayer())
+	db, _ := NewDatabase("./")
 	_ = db.SetPolyTxReproving("1111", "2222", &pt.Header{
 		ChainID: 666,
 		Height:  666,

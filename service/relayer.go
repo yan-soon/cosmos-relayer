@@ -18,21 +18,30 @@
 package service
 
 import (
+	c "context"
 	"encoding/hex"
 	"fmt"
-	types2 "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
-	"github.com/cosmos/cosmos-sdk/x/auth/types"
-	"github.com/polynetwork/cosmos-poly-module/ccm"
-	"github.com/polynetwork/cosmos-poly-module/headersync"
-	"github.com/polynetwork/cosmos-relayer/context"
-	"github.com/polynetwork/cosmos-relayer/log"
-	mcli "github.com/polynetwork/poly-go-sdk/client"
-	mtypes "github.com/polynetwork/poly/core/types"
-	mcosmos "github.com/polynetwork/poly/native/service/header_sync/cosmos"
-	core_types "github.com/tendermint/tendermint/rpc/core/types"
 	"strings"
 	"time"
+
+	abcitypes "github.com/tendermint/tendermint/abci/types"
+	tmcoretypes "github.com/tendermint/tendermint/rpc/core/types"
+
+	clienttx "github.com/cosmos/cosmos-sdk/client/tx"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
+	signingtypes "github.com/cosmos/cosmos-sdk/types/tx/signing"
+	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
+
+	client "github.com/polynetwork/poly-go-sdk/client"
+	coretypes "github.com/polynetwork/poly/core/types"
+	hsc "github.com/polynetwork/poly/native/service/header_sync/cosmos"
+
+	ccmtypes "github.com/Switcheo/polynetwork-cosmos/x/ccm/types"
+	headersynctypes "github.com/Switcheo/polynetwork-cosmos/x/headersync/types"
+
+	"github.com/polynetwork/cosmos-relayer/context"
+	"github.com/polynetwork/cosmos-relayer/log"
 )
 
 func StartRelay() {
@@ -69,7 +78,7 @@ func ToPolyRoutine() {
 // Process cosmos-headers msg. This function would not return before our
 // Ploygon tx committing headers confirmed. This guarantee that the next
 // cross-chain txs next to relay can be proved on Poly.
-func handleCosmosHdrs(headers []*mcosmos.CosmosHeader) error {
+func handleCosmosHdrs(headers []*hsc.CosmosHeader) error {
 	if ctx.PolyStatus.Len() > 0 {
 		ctx.PolyStatus.IsBlocked = true
 		ctx.PolyStatus.CosmosEpochHeight = headers[0].Header.Height
@@ -77,7 +86,7 @@ func handleCosmosHdrs(headers []*mcosmos.CosmosHeader) error {
 		ctx.PolyStatus.Wg.Add(1)
 	}
 	for i := 0; i < len(headers); i += context.HdrLimitPerBatch {
-		var hdrs []*mcosmos.CosmosHeader
+		var hdrs []*hsc.CosmosHeader
 		if i+context.HdrLimitPerBatch > len(headers) {
 			hdrs = headers[i:]
 		} else {
@@ -86,7 +95,7 @@ func handleCosmosHdrs(headers []*mcosmos.CosmosHeader) error {
 		info := make([]string, len(hdrs))
 		raw := make([][]byte, len(hdrs))
 		for i, h := range hdrs {
-			r, err := ctx.CMCdc.MarshalBinaryBare(*h)
+			r, err := ctx.Cosmos.Cdc.MarshalBinaryBare(*h)
 			if err != nil {
 				log.Fatalf("[handleCosmosHdr] failed to marshal CosmosHeader: %v", err)
 				return err
@@ -99,7 +108,7 @@ func handleCosmosHdrs(headers []*mcosmos.CosmosHeader) error {
 		txhash, err := ctx.Poly.Native.Hs.SyncBlockHeader(ctx.Conf.SideChainId, ctx.PolyAcc.Address,
 			raw, ctx.PolyAcc)
 		if err != nil {
-			if _, ok := err.(mcli.PostErr); ok {
+			if _, ok := err.(client.PostErr); ok {
 				log.Errorf("[handleCosmosHdr] post error, retry after 10 sec wait: %v", err)
 				context.SleepSecs(10)
 				goto SYNC_RETRY
@@ -139,8 +148,8 @@ func handleCosmosHdrs(headers []*mcosmos.CosmosHeader) error {
 }
 
 // Relay COSMOS cross-chain tx to polygon.
-func handleCosmosTx(tx *context.CosmosTx, hdr *mcosmos.CosmosHeader) {
-	raw, err := ctx.CMCdc.MarshalBinaryBare(*hdr)
+func handleCosmosTx(tx *context.CosmosTx, hdr *hsc.CosmosHeader) {
+	raw, err := ctx.Cosmos.Cdc.MarshalBinaryBare(*hdr)
 	if err != nil {
 		panic(fmt.Errorf("failed to marshal cosmos header %s: %v", hdr.Commit.BlockID.Hash.String(), err))
 	}
@@ -166,7 +175,7 @@ RELAY_RETRY:
 			if err = ctx.Db.SetCosmosTxReproving(tx.Tx); err != nil {
 				panic(fmt.Errorf("[handleCosmosTx] failed to save cosmos tx into DB: %v", err))
 			}
-		} else if _, ok := err.(mcli.PostErr); ok {
+		} else if _, ok := err.(client.PostErr); ok {
 			log.Errorf("[handleCosmosTx] post error, retry after 10 sec wait: %v", err)
 			context.SleepSecs(10)
 			goto RELAY_RETRY
@@ -208,14 +217,14 @@ func ToCosmosRoutine() {
 }
 
 // Commit and confirm the Poly header to COSMOS
-func handlePolyHdr(hdr *mtypes.Header) {
+func handlePolyHdr(hdr *coretypes.Header) {
 	if ctx.CMStatus.Len() > 0 {
 		ctx.CMStatus.IsBlocked = true
 		ctx.CMStatus.PolyEpochHeight = hdr.Height
 		ctx.CMStatus.Wg.Wait()
 	}
-	res, seq, err := sendCosmosTx([]types2.Msg{
-		headersync.NewMsgSyncHeadersParam(ctx.CMAcc, []string{hex.EncodeToString(hdr.ToArray())}),
+	res, seq, err := sendCosmosTx([]sdk.Msg{
+		headersynctypes.NewMsgSyncHeaders(ctx.Cosmos.Address.String(), []string{hex.EncodeToString(hdr.ToArray())}),
 	})
 	if err != nil {
 		log.Fatalf("[handlePolyHdr] handlePolyHdr error: %v", err)
@@ -225,14 +234,21 @@ func handlePolyHdr(hdr *mtypes.Header) {
 	tick := time.NewTicker(100 * time.Millisecond)
 	startTime := time.Now()
 	hash := hdr.Hash()
-	var resTx *core_types.ResultTx
+	var resTx *tmcoretypes.ResultTx
 	for range tick.C {
-		resTx, _ = ctx.CMRpcCli.Tx(res.Hash, false)
+		client := txtypes.NewServiceClient(ctx.Cosmos.GrpcConn)
+		resTx, err := client.GetTx(c.Background(), &txtypes.GetTxRequest{Hash: res.Hash.String()})
+		if err != nil {
+			panic(err)
+		}
 		if resTx == nil {
 			continue
 		}
-		status, _ := ctx.CMRpcCli.Status()
-		if resTx.Height > 0 && status.SyncInfo.LatestBlockHeight > resTx.Height {
+		info, err := ctx.Cosmos.GrpcClient.InfoSync(abcitypes.RequestInfo{})
+		if err != nil {
+			panic(err)
+		}
+		if resTx.TxResponse.Height > 0 && info.LastBlockHeight > resTx.TxResponse.Height {
 			break
 		}
 		if startTime.Add(100 * time.Millisecond); startTime.Second() > ctx.Conf.ConfirmTimeout {
@@ -253,8 +269,8 @@ func handlePolyTx(val *context.PolyInfo) {
 		ctx.CMStatus.Wg.Wait()
 		ctx.CMStatus.Wg.Add(1)
 	}
-	res, seq, err := sendCosmosTx([]types2.Msg{
-		ccm.NewMsgProcessCrossChainTx(ctx.CMAcc, ctx.Poly.ChainId, val.Tx.Proof,
+	res, seq, err := sendCosmosTx([]sdk.Msg{
+		ccmtypes.NewMsgProcessCrossChainTx(ctx.Cosmos.Address.String(), ctx.Poly.ChainId, val.Tx.Proof,
 			hex.EncodeToString(val.Hdr.ToArray()), val.HeaderProof, val.EpochAnchor),
 	})
 	if err != nil {
@@ -268,46 +284,81 @@ func handlePolyTx(val *context.PolyInfo) {
 		"poly_hash: %s, sequence: %d)", res.Hash.String(), res.Code, res.Log, val.Tx.Height, val.Tx.TxHash, seq)
 }
 
-func sendCosmosTx(msgs []types2.Msg) (*core_types.ResultBroadcastTx, uint64, error) {
-	seq := ctx.CMSeq.GetAndAdd()
-	toSign := types.StdSignMsg{
-		Sequence:      seq,
-		AccountNumber: ctx.CMAccNum,
-		ChainID:       ctx.Conf.CosmosChainId,
-		Msgs:          msgs,
-		Fee:           types.NewStdFee(ctx.CMGas, ctx.CMFees),
-	}
-	sig, err := ctx.CMPrivk.Sign(toSign.Bytes())
+func sendCosmosTx(msgs []sdk.Msg) (res *tmcoretypes.ResultBroadcastTx, seq uint64, err error) {
+	seq = ctx.Cosmos.Sequence.GetAndAdd()
+	txBuilder := ctx.NewTxBuilder()
+
+	err = txBuilder.SetMsgs(msgs...)
 	if err != nil {
-		return nil, seq, fmt.Errorf("failed to sign raw tx: (error: %v, raw tx: %x)", err, toSign.Bytes())
+		return
 	}
 
-	tx := types.NewStdTx(msgs, toSign.Fee, []auth.StdSignature{{ctx.CMPrivk.PubKey(), sig}}, toSign.Memo)
-	encoder := auth.DefaultTxEncoder(ctx.CMCdc)
-	rawTx, err := encoder(tx)
-	if err != nil {
-		return nil, seq, fmt.Errorf("failed to encode signed tx: %v", err)
+	// Adapted from: https://docs.cosmos.network/master/run-node/txs.html#broadcasting-a-transaction-3
+
+	// First round: we gather all the signer infos. We use the "set empty
+	// signature" hack to do that.
+	sigV2 := signingtypes.SignatureV2{
+		PubKey: ctx.Cosmos.PrivKey.PubKey(),
+		Data: &signingtypes.SingleSignatureData{
+			SignMode:  ctx.Cosmos.TxConfig.SignModeHandler().DefaultMode(),
+			Signature: nil,
+		},
+		Sequence: seq,
 	}
-	var res *core_types.ResultBroadcastTx
+	err = txBuilder.SetSignatures(sigV2)
+	if err != nil {
+		return
+	}
+
+	// Second round: all signer infos are set, so each signer can sign.
+	signerData := authsigning.SignerData{
+		ChainID:       ctx.Conf.CosmosChainId,
+		AccountNumber: ctx.Cosmos.AccountNumber,
+		Sequence:      seq,
+	}
+
+	sigV2, err = clienttx.SignWithPrivKey(
+		ctx.Cosmos.TxConfig.SignModeHandler().DefaultMode(), signerData,
+		txBuilder, ctx.Cosmos.PrivKey, ctx.Cosmos.TxConfig, seq)
+
+	if err != nil {
+		return
+	}
+
+	err = txBuilder.SetSignatures(sigV2)
+	txn := txBuilder.GetTx()
+	txBytes, err := ctx.Cosmos.TxConfig.TxEncoder()(txn)
+	if err != nil {
+		return
+	}
+
 	for {
-		res, err = ctx.CMRpcCli.BroadcastTxSync(rawTx)
+		txClient := txtypes.NewServiceClient(ctx.Cosmos.GrpcConn)
+		res, err := txClient.BroadcastTx(
+			c.Background(),
+			&txtypes.BroadcastTxRequest{
+				Mode:    txtypes.BroadcastMode_BROADCAST_MODE_SYNC,
+				TxBytes: txBytes, // Proto-binary of the signed transaction, see previous step.
+			},
+		)
 		if err != nil {
 			if strings.Contains(err.Error(), context.BroadcastConnTimeOut) {
 				context.SleepSecs(10)
 				continue
 			}
-			return nil, seq, fmt.Errorf("failed to broadcast tx: (error: %v, raw tx: %x)", err, rawTx)
+			return nil, seq, fmt.Errorf("failed to broadcast tx: (error: %v, raw tx: %x)", err, txn)
 		}
-		if res.Code != 0 {
-			if strings.Contains(res.Log, context.SeqErr) {
+		if res.TxResponse.Code != 0 {
+			if strings.Contains(res.TxResponse.RawLog, context.SeqErr) {
 				context.SleepSecs(1)
 				continue
 			}
-			return nil, seq, fmt.Errorf("failed to check tx: (code: %d, sequence: %d, log: %s)", res.Code, seq, res.Log)
+			return nil, seq, fmt.Errorf("failed to check tx: (code: %d, sequence: %d, log: %s)",
+				res.TxResponse.Code, seq, res.TxResponse.RawLog)
 		} else {
 			break
 		}
 	}
 
-	return res, seq, nil
+	return
 }

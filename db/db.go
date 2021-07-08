@@ -22,15 +22,16 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"path"
+	"strings"
+	"sync"
+
 	"github.com/boltdb/bolt"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/polynetwork/poly/common"
 	"github.com/polynetwork/poly/core/types"
-	tb "github.com/tendermint/tendermint/libs/bytes"
-	"github.com/tendermint/tendermint/rpc/core/types"
-	"path"
-	"strings"
-	"sync"
+	tmbytes "github.com/tendermint/tendermint/libs/bytes"
+	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 )
 
 var (
@@ -42,17 +43,18 @@ var (
 	PolyStatusKey   = []byte("poly_status")
 )
 
+var cdc = codec.NewLegacyAmino()
+
 type Database struct {
 	rwl                  *sync.RWMutex
 	bdb                  *bolt.DB
 	cosmosTxInChanMap    map[string]bool
 	polyTxInChanMap      map[string]bool
-	cdc                  *codec.Codec
 	totalReproveCosmosTx int
 	totalReprovePolyTx   int
 }
 
-func NewDatabase(dbPath string, cdc *codec.Codec) (*Database, error) {
+func NewDatabase(dbPath string) (*Database, error) {
 	if !strings.Contains(dbPath, ".bin") {
 		dbPath = path.Join(dbPath, "db.bin")
 	}
@@ -63,7 +65,6 @@ func NewDatabase(dbPath string, cdc *codec.Codec) (*Database, error) {
 	}
 	instance.bdb = bdb
 	instance.rwl = new(sync.RWMutex)
-	instance.cdc = cdc
 	instance.cosmosTxInChanMap = make(map[string]bool)
 	instance.polyTxInChanMap = make(map[string]bool)
 	if err = bdb.Update(func(tx *bolt.Tx) error {
@@ -88,7 +89,7 @@ func NewDatabase(dbPath string, cdc *codec.Codec) (*Database, error) {
 
 		bucket := tx.Bucket(CosmosReProve)
 		if err = bucket.ForEach(func(k, v []byte) error {
-			instance.cosmosTxInChanMap[tb.HexBytes(k).String()] = false
+			instance.cosmosTxInChanMap[tmbytes.HexBytes(k).String()] = false
 			return nil
 		}); err != nil {
 			return err
@@ -96,7 +97,7 @@ func NewDatabase(dbPath string, cdc *codec.Codec) (*Database, error) {
 
 		bucket = tx.Bucket(PolyReProve)
 		if err = bucket.ForEach(func(k, v []byte) error {
-			instance.polyTxInChanMap[tb.HexBytes(k).String()] = false
+			instance.polyTxInChanMap[tmbytes.HexBytes(k).String()] = false
 			return nil
 		}); err != nil {
 			return err
@@ -186,7 +187,7 @@ func (db *Database) SetCosmosTxReproving(rTx *coretypes.ResultTx) error {
 	db.rwl.Lock()
 	defer db.rwl.Unlock()
 
-	raw, err := db.cdc.MarshalJSON(rTx)
+	raw, err := cdc.MarshalJSON(rTx)
 	if err != nil {
 		return err
 	}
@@ -215,8 +216,8 @@ func (db *Database) GetCosmosTxReproving() ([]*coretypes.ResultTx, error) {
 		bucket := tx.Bucket(CosmosReProve)
 		if err := bucket.ForEach(func(k, v []byte) error {
 			rTx := &coretypes.ResultTx{}
-			if err := db.cdc.UnmarshalJSON(v, rTx); err != nil {
-				return fmt.Errorf("failed to unmarshal %s: %v", tb.HexBytes(k).String(), err)
+			if err := cdc.UnmarshalJSON(v, rTx); err != nil {
+				return fmt.Errorf("failed to unmarshal %s: %v", tmbytes.HexBytes(k).String(), err)
 			}
 			if db.cosmosTxInChanMap[rTx.Hash.String()] {
 				return nil
@@ -235,7 +236,7 @@ func (db *Database) GetCosmosTxReproving() ([]*coretypes.ResultTx, error) {
 	return arr, nil
 }
 
-func (db *Database) SetCosmosTxTxInChan(hash tb.HexBytes) {
+func (db *Database) SetCosmosTxTxInChan(hash tmbytes.HexBytes) {
 	db.rwl.Lock()
 	defer db.rwl.Unlock()
 
@@ -246,7 +247,7 @@ func (db *Database) SetCosmosTxTxInChan(hash tb.HexBytes) {
 	}
 }
 
-func (db *Database) DelCosmosTxReproving(hash tb.HexBytes) error {
+func (db *Database) DelCosmosTxReproving(hash tmbytes.HexBytes) error {
 	db.rwl.Lock()
 	defer db.rwl.Unlock()
 
@@ -355,7 +356,7 @@ func (db *Database) DelPolyTxReproving(txhash string) error {
 	})
 }
 
-func (db *Database) SetTxToCosmosStatus(hash tb.HexBytes, pph *PolyProofAndHeader) error {
+func (db *Database) SetTxToCosmosStatus(hash tmbytes.HexBytes, pph *PolyProofAndHeader) error {
 	db.rwl.Lock()
 	defer db.rwl.Unlock()
 
@@ -386,7 +387,7 @@ func (db *Database) LoadCosmosStatus(m *sync.Map) (int, error) {
 			}
 			hash := make([]byte, len(k))
 			copy(hash, k)
-			hb := tb.HexBytes(hash)
+			hb := tmbytes.HexBytes(hash)
 			m.Store(hb.String(), pph)
 			num++
 			return nil
@@ -400,7 +401,7 @@ func (db *Database) LoadCosmosStatus(m *sync.Map) (int, error) {
 	return num, nil
 }
 
-func (db *Database) DelTxInCosmosStatus(hash tb.HexBytes) error {
+func (db *Database) DelTxInCosmosStatus(hash tmbytes.HexBytes) error {
 	db.rwl.Lock()
 	defer db.rwl.Unlock()
 
@@ -417,7 +418,7 @@ func (db *Database) SetTxToPolyStatus(hash common.Uint256, rtx *coretypes.Result
 	db.rwl.Lock()
 	defer db.rwl.Unlock()
 
-	raw, err := db.cdc.MarshalJSON(rtx)
+	raw, err := cdc.MarshalJSON(rtx)
 	if err != nil {
 		return err
 	}
@@ -439,7 +440,7 @@ func (db *Database) LoadPolyStatus(m *sync.Map) (int, error) {
 		bucket := tx.Bucket(PolyStatusKey)
 		if err := bucket.ForEach(func(k, v []byte) error {
 			rtx := &coretypes.ResultTx{}
-			if err := db.cdc.UnmarshalJSON(v, rtx); err != nil {
+			if err := cdc.UnmarshalJSON(v, rtx); err != nil {
 				return err
 			}
 			txHash, err := common.Uint256ParseFromBytes(k)

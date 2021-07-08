@@ -1,16 +1,26 @@
 module github.com/polynetwork/cosmos-relayer
 
-go 1.14
+go 1.16
 
 require (
 	github.com/FactomProject/basen v0.0.0-20150613233007-fe3947df716e // indirect
+	github.com/Switcheo/polynetwork-cosmos v0.0.0-20210609103003-8471a1901d49
 	github.com/boltdb/bolt v1.3.1
-	github.com/cosmos/cosmos-sdk v0.39.1
+	github.com/cosmos/cosmos-sdk v0.42.4
 	github.com/ontio/go-bip32 v0.0.0-20190520025953-d3cea6894a2b // indirect
-	github.com/ontio/ontology v1.11.0
-	github.com/polynetwork/cosmos-poly-module v0.0.0-20200722084435-f917a9a3331f
-	github.com/polynetwork/poly v0.0.0-20200715030435-4f1d1a0adb44
-	github.com/polynetwork/poly-go-sdk v0.0.0-20200722030827-6875b6018b93
-	github.com/stretchr/testify v1.6.1
-	github.com/tendermint/tendermint v0.33.7
+	github.com/ontio/ontology v1.11.1-0.20200812075204-26cf1fa5dd47
+	github.com/polynetwork/poly v0.0.0-20210629094731-3f755d4b4404
+	github.com/polynetwork/poly-go-sdk v0.0.0-20210114120411-3dcba035134f
+	github.com/stretchr/testify v1.7.0
+	github.com/tendermint/tendermint v0.34.9
+	google.golang.org/grpc v1.38.0
+	google.golang.org/protobuf v1.26.0
 )
+
+replace google.golang.org/grpc => google.golang.org/grpc v1.33.2
+
+replace github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
+
+replace github.com/cosmos/cosmos-sdk => github.com/Switcheo/cosmos-sdk v0.42.4-0.20210614065833-8f123154d4c8
+
+replace github.com/polynetwork/poly => github.com/Switcheo/poly v0.0.0-20210708043258-47d107cc1dc3

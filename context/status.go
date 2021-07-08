@@ -18,19 +18,26 @@
 package context
 
 import (
+	c "context"
 	"encoding/hex"
 	"fmt"
-	"github.com/polynetwork/cosmos-poly-module/ccm"
-	"github.com/polynetwork/cosmos-relayer/db"
-	"github.com/polynetwork/cosmos-relayer/log"
-	"github.com/polynetwork/poly/common"
-	ccmc "github.com/polynetwork/poly/native/service/cross_chain_manager/common"
-	"github.com/polynetwork/poly/native/service/utils"
-	"github.com/tendermint/tendermint/libs/bytes"
-	rpctypes "github.com/tendermint/tendermint/rpc/core/types"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/cosmos/cosmos-sdk/types/tx"
+	"github.com/tendermint/tendermint/abci/types"
+	"github.com/tendermint/tendermint/libs/bytes"
+	rpctypes "github.com/tendermint/tendermint/rpc/core/types"
+
+	"github.com/polynetwork/poly/common"
+	ccmc "github.com/polynetwork/poly/native/service/cross_chain_manager/common"
+	"github.com/polynetwork/poly/native/service/utils"
+
+	ccmkeeper "github.com/Switcheo/polynetwork-cosmos/x/ccm/keeper"
+
+	"github.com/polynetwork/cosmos-relayer/db"
+	"github.com/polynetwork/cosmos-relayer/log"
 )
 
 func NewCosmosStatus() (*CosmosStatus, error) {
@@ -89,7 +96,7 @@ func (s *CosmosStatus) Len() int {
 // TODO: 交易丢失了怎么办，会一直循环查找地！！
 func (s *CosmosStatus) Check() {
 	tick := time.NewTicker(time.Second)
-	var resTx *rpctypes.ResultTx
+	client := tx.NewServiceClient(RCtx.Cosmos.GrpcConn)
 	for range tick.C {
 		kArr := make([]bytes.HexBytes, 0)
 		vArr := make([]*db.PolyProofAndHeader, 0)
@@ -104,29 +111,36 @@ func (s *CosmosStatus) Check() {
 			s.Wg.Done()
 		}
 		for i, v := range kArr {
-			resTx, _ = RCtx.CMRpcCli.Tx(v, false)
-			if resTx == nil {
-				continue
+			res, err := client.GetTx(c.Background(), &tx.GetTxRequest{Hash: v.String()})
+			if err != nil {
+				panic(err)
 			}
-			if resTx.Height > 0 {
-				if resTx.TxResult.Code == 0 {
+			if res.TxResponse.Height > 0 {
+				if res.TxResponse.Code == 0 {
 					log.Infof("[Cosmos Status] cosmso tx %s is confirmed on block (height: %d) and success. ",
-						v.String(), resTx.Height)
+						v.String(), res.TxResponse.Height)
 				} else {
-					if strings.Contains(resTx.TxResult.Log, CosmosTxNotInEpoch) {
+					if strings.Contains(res.TxResponse.RawLog, CosmosTxNotInEpoch) {
 						log.Debugf("[Cosmos Status] cosmso tx %s is failed and this proof %s need reprove. ",
 							v.String(), vArr[i].Proof)
 						if err := RCtx.Db.SetPolyTxReproving(vArr[i].Txhash, vArr[i].Proof, vArr[i].Hdr); err != nil {
 							panic(err)
 						}
 					} else {
-						if res, _ := RCtx.CMRpcCli.ABCIQuery(ProofPath, ccm.GetDoneTxKey(vArr[i].FromChainId, vArr[i].CCID)); res != nil && res.Response.GetValue() != nil {
+						res, err := RCtx.Cosmos.GrpcClient.QuerySync(types.RequestQuery{
+							Data: ccmkeeper.GetDoneTxKey(vArr[i].FromChainId, vArr[i].CCID),
+							Path: ProofPath,
+						})
+						if err != nil {
+							panic(err)
+						}
+						if res.GetValue() != nil {
 							log.Infof("[Cosmos Status] this poly tx %s is already committed, "+
 								"so delete it cosmos_txhash %s: (from_chain_id: %d, ccid: %s)",
 								vArr[i].Txhash, v.String(), vArr[i].FromChainId, hex.EncodeToString(vArr[i].CCID))
 						} else {
 							log.Errorf("[Cosmos Status] cosmso tx %s is confirmed on block (height: %d) "+
-								"and failed (Log: %s). ", v.String(), resTx.Height, resTx.TxResult.Log)
+								"and failed (Log: %s). ", v.String(), res.Height, res.Log)
 						}
 					}
 				}
