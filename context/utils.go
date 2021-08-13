@@ -69,6 +69,11 @@ func setCosmosEnv(chainId string) {
 		config.SetBech32PrefixForAccount("swth", "swthpub")
 		config.SetBech32PrefixForValidator("swthvaloper", "swthvaloperpub")
 		config.SetBech32PrefixForConsensusNode("swthvalcons", "swthvalconspub")
+	case "carbon":
+		config := types.GetConfig()
+		config.SetBech32PrefixForAccount("swth", "swthpub")
+		config.SetBech32PrefixForValidator("swthvaloper", "swthvaloperpub")
+		config.SetBech32PrefixForConsensusNode("swthvalcons", "swthvalconspub")
 	default:
 		log.Warnf("cosmos chain id not known %s, so use default settings", chainId)
 	}

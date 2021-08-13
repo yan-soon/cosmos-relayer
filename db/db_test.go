@@ -24,7 +24,6 @@ import (
 	pt "github.com/polynetwork/poly/core/types"
 	"github.com/stretchr/testify/assert"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	"github.com/tendermint/tendermint/libs/kv"
 	tmcoretypes "github.com/tendermint/tendermint/rpc/core/types"
 )
 
@@ -39,8 +38,8 @@ var (
 			Events: []abcitypes.Event{
 				abcitypes.Event{
 					Type: "gogogo",
-					Attributes: []kv.Pair{
-						kv.Pair{
+					Attributes: []abcitypes.EventAttribute{
+						{
 							Key:   []byte{1},
 							Value: []byte{2},
 						},
