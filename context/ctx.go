@@ -68,18 +68,21 @@ func InitCtx(conf *Conf) (err error) {
 	// prepare COSMOS stuff
 	// legacy cdc
 	RCtx.Cosmos.Cdc = codec.NewLegacyAmino()
+	log.Tracef("cdc")
 
 	// init grpc client for tendermint
 	RCtx.Cosmos.GrpcClient = grpcli.NewGRPCClient(conf.CosmosRpcAddr, true)
 	if err := RCtx.Cosmos.GrpcClient.Start(); err != nil {
 		return fmt.Errorf("failed to init grpc client: %v", err)
 	}
+	log.Tracef("grpc cli")
 
 	// init grpc connection for cosmos-sdk
 	if RCtx.Cosmos.GrpcConn, err = GetGRPCConnection(conf.CosmosRpcAddr); err != nil {
 		return fmt.Errorf("failed to init grpc connection: %v", err)
 	}
 	defer RCtx.Cosmos.GrpcConn.Close()
+	log.Tracef("grpc conn")
 
 	// init tx config for signing txs
 	interfaceRegistry := codectypes.NewInterfaceRegistry()
@@ -103,6 +106,7 @@ func InitCtx(conf *Conf) (err error) {
 	if err != nil {
 		return err
 	}
+	log.Tracef("query")
 	ba := authtypes.BaseAccount{}
 	err = ba.Unmarshal(accountRes.Account.Value)
 	if err != nil {

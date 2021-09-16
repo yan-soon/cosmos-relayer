@@ -50,6 +50,7 @@ func main() {
 	}
 
 	log.InitLog(conf.LogLevel, os.Stdout)
+	log.Tracef("Starting")
 
 	// If not set by flag, try to get pwd from configuration file.
 	if orcPwd != "" {
@@ -65,6 +66,7 @@ func main() {
 		conf.PolyWalletPwd = string(pwd)
 		fmt.Println("done")
 	}
+	log.Tracef("Loaded poly wallet")
 
 	if cosmosPwd != "" {
 		conf.CosmosWalletPwd = cosmosPwd
@@ -78,6 +80,7 @@ func main() {
 		conf.CosmosWalletPwd = string(pwd)
 		fmt.Println("done")
 	}
+	log.Tracef("Loaded cosmos wallet")
 
 	// all tools and info hold by context object.
 	if err = context.InitCtx(conf); err != nil {

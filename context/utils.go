@@ -48,7 +48,7 @@ func GetCosmosPrivateKey(path string, pwd []byte) (cryptotypes.PrivKey, types.Ac
 
 	privKey, _, err := crypto.UnarmorDecryptPrivKey(string(bz), string(pwd))
 	if err != nil {
-		return nil, types.AccAddress{}, fmt.Errorf("failed to decrypt private key: v", err)
+		return nil, types.AccAddress{}, fmt.Errorf("failed to decrypt private key: %v", err)
 	}
 
 	return privKey, types.AccAddress(privKey.PubKey().Address().Bytes()), nil
