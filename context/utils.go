@@ -58,6 +58,8 @@ func setCosmosEnv(chainId string) {
 	switch chainId {
 	case "cc-cosmos":
 		return
+	case "carbon-1":
+		fallthrough
 	case "switcheochain":
 		config := types.GetConfig()
 		config.SetBech32PrefixForAccount("swth", "swthpub")
