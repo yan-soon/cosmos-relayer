@@ -87,6 +87,7 @@ func main() {
 		log.Fatalf("failed to init context: %v", err)
 		panic(err)
 	}
+	defer context.RCtx.Cosmos.GrpcConn.Close()
 
 	log.Infof("using acc: (cosmos: %s, poly: %s)", context.RCtx.Cosmos.Address.String(), context.RCtx.PolyAcc.Address.ToBase58())
 

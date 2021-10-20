@@ -87,7 +87,6 @@ func InitCtx(conf *Conf) (err error) {
 	if RCtx.Cosmos.GrpcConn, err = GetGRPCConnection(conf.CosmosGrpcAddr); err != nil {
 		return fmt.Errorf("failed to init grpc connection: %v", err)
 	}
-	defer RCtx.Cosmos.GrpcConn.Close()
 	log.Tracef("grpc conn initalized")
 
 	// init tx config for signing txs
