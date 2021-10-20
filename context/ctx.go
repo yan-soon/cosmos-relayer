@@ -59,7 +59,7 @@ var (
 
 func InitCtx(conf *Conf) (err error) {
 	RCtx.Conf = conf
-	setCosmosEnv(conf.CosmosChainId)
+	setCosmosConfig(conf.CosmosAddrPrefix)
 
 	// channels
 	RCtx.ToCosmos = make(chan *PolyInfo, ChanBufSize)

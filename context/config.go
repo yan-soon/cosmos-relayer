@@ -29,6 +29,7 @@ type Conf struct {
 	CosmosStartHeight    int64  `json:"cosmos_start_height"`
 	CosmosListenInterval int    `json:"cosmos_listen_interval"`
 	CosmosChainId        string `json:"cosmos_chain_id"`
+	CosmosAddrPrefix     string `json:"cosmos_address_prefix"`
 	CosmosTxFee          string `json:"cosmos_tx_fee"`
 	CosmosGasLimit       uint64 `json:"cosmos_gas_limit"`
 

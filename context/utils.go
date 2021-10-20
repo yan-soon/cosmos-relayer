@@ -24,7 +24,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/cosmos/cosmos-sdk/types"
-	"github.com/polynetwork/cosmos-relayer/log"
 	polysdk "github.com/polynetwork/poly-go-sdk"
 )
 
@@ -54,31 +53,12 @@ func GetCosmosPrivateKey(path string, pwd []byte) (cryptotypes.PrivKey, types.Ac
 	return privKey, types.AccAddress(privKey.PubKey().Address().Bytes()), nil
 }
 
-func setCosmosEnv(chainId string) {
-	switch chainId {
-	case "cc-cosmos":
-		return
-	case "carbon-1":
-		fallthrough
-	case "switcheochain":
-		config := types.GetConfig()
-		config.SetBech32PrefixForAccount("swth", "swthpub")
-		config.SetBech32PrefixForValidator("swthvaloper", "swthvaloperpub")
-		config.SetBech32PrefixForConsensusNode("swthvalcons", "swthvalconspub")
-		config.Seal()
-	case "switcheo-tradehub-1":
-		config := types.GetConfig()
-		config.SetBech32PrefixForAccount("swth", "swthpub")
-		config.SetBech32PrefixForValidator("swthvaloper", "swthvaloperpub")
-		config.SetBech32PrefixForConsensusNode("swthvalcons", "swthvalconspub")
-	case "carbon":
-		config := types.GetConfig()
-		config.SetBech32PrefixForAccount("swth", "swthpub")
-		config.SetBech32PrefixForValidator("swthvaloper", "swthvaloperpub")
-		config.SetBech32PrefixForConsensusNode("swthvalcons", "swthvalconspub")
-	default:
-		log.Warnf("cosmos chain id not known %s, so use default settings", chainId)
-	}
+func setCosmosConfig(addressPrefix string) {
+	config := types.GetConfig()
+	config.SetBech32PrefixForAccount(addressPrefix, addressPrefix+"pub")
+	config.SetBech32PrefixForValidator(addressPrefix+"valoper", addressPrefix+"valoperpub")
+	config.SetBech32PrefixForConsensusNode(addressPrefix+"valcons", addressPrefix+"valconspub")
+	config.Seal()
 }
 
 func setUpPoly(poly *polysdk.PolySdk) error {

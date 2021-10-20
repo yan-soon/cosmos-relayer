@@ -6,6 +6,7 @@
   "cosmos_listen_interval": 1,
   "cosmos_chain_id": "carbon",
   "cosmos_tx_fee": "1swth",
+  "cosmos_address_prefix": "swth",
   "cosmos_gas_limit": 100000000,
 
   "poly_rpc_addr": "http://beta1.poly.network:20336",
