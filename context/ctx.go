@@ -68,21 +68,27 @@ func InitCtx(conf *Conf) (err error) {
 	// prepare COSMOS stuff
 	// legacy cdc
 	RCtx.Cosmos.Cdc = codec.NewLegacyAmino()
-	log.Tracef("cdc")
+	log.Tracef("initializing")
+
+	// init http rpc client for tendermint for unmigrated stuff
+	if RCtx.Cosmos.RpcClient, err = rpchttp.New(conf.CosmosRpcAddr, "/websocket"); err != nil {
+		return fmt.Errorf("failed to init rpc client: %v", err)
+	}
+	log.Tracef("rpc client initalized")
 
 	// init grpc client for tendermint
-	RCtx.Cosmos.GrpcClient = grpcli.NewGRPCClient(conf.CosmosRpcAddr, true)
-	if err := RCtx.Cosmos.GrpcClient.Start(); err != nil {
+	RCtx.Cosmos.GrpcClient = grpcli.NewGRPCClient(conf.CosmosGrpcAddr, true)
+	if err = RCtx.Cosmos.GrpcClient.Start(); err != nil {
 		return fmt.Errorf("failed to init grpc client: %v", err)
 	}
-	log.Tracef("grpc cli")
+	log.Tracef("grpc client initalized")
 
 	// init grpc connection for cosmos-sdk
-	if RCtx.Cosmos.GrpcConn, err = GetGRPCConnection(conf.CosmosRpcAddr); err != nil {
+	if RCtx.Cosmos.GrpcConn, err = GetGRPCConnection(conf.CosmosGrpcAddr); err != nil {
 		return fmt.Errorf("failed to init grpc connection: %v", err)
 	}
 	defer RCtx.Cosmos.GrpcConn.Close()
-	log.Tracef("grpc conn")
+	log.Tracef("grpc conn initalized")
 
 	// init tx config for signing txs
 	interfaceRegistry := codectypes.NewInterfaceRegistry()

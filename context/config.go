@@ -23,6 +23,7 @@ import (
 )
 
 type Conf struct {
+	CosmosGrpcAddr       string `json:"cosmos_grpc_addr"`
 	CosmosRpcAddr        string `json:"cosmos_rpc_addr"`
 	CosmosWallet         string `json:"cosmos_wallet"`
 	CosmosWalletPwd      string `json:"cosmos_wallet_pwd"`
