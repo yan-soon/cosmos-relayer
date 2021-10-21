@@ -33,7 +33,6 @@ import (
 	authtxtypes "github.com/cosmos/cosmos-sdk/x/auth/tx"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 
-	grpcli "github.com/tendermint/tendermint/abci/client"
 	rpchttp "github.com/tendermint/tendermint/rpc/client/http"
 	rpctypes "github.com/tendermint/tendermint/rpc/core/types"
 
@@ -65,7 +64,6 @@ func InitCtx(conf *Conf) (err error) {
 	RCtx.ToCosmos = make(chan *PolyInfo, ChanBufSize)
 	RCtx.ToPoly = make(chan *CosmosInfo, ChanBufSize)
 
-	// prepare COSMOS stuff
 	// legacy cdc
 	RCtx.Cosmos.Cdc = codec.NewLegacyAmino()
 	log.Tracef("initializing")
@@ -75,13 +73,6 @@ func InitCtx(conf *Conf) (err error) {
 		return fmt.Errorf("failed to init rpc client: %v", err)
 	}
 	log.Tracef("rpc client initalized")
-
-	// init grpc client for tendermint
-	RCtx.Cosmos.GrpcClient = grpcli.NewGRPCClient(conf.CosmosGrpcAddr, true)
-	if err = RCtx.Cosmos.GrpcClient.Start(); err != nil {
-		return fmt.Errorf("failed to init grpc client: %v", err)
-	}
-	log.Tracef("grpc client initalized")
 
 	// init grpc connection for cosmos-sdk
 	if RCtx.Cosmos.GrpcConn, err = GetGRPCConnection(conf.CosmosGrpcAddr); err != nil {
@@ -156,7 +147,6 @@ type Cosmos struct {
 	TxConfig      sdkcli.TxConfig
 	RpcClient     *rpchttp.HTTP
 	GrpcConn      *grpc.ClientConn // to build sdk grpc clients for sdk queries
-	GrpcClient    grpcli.Client    // for tm grpc queries
 	PrivKey       cryptotypes.PrivKey
 	Address       sdk.AccAddress
 	Sequence      *CosmosSeq

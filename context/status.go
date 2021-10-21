@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/cosmos/cosmos-sdk/types/tx"
-	"github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/libs/bytes"
 	rpctypes "github.com/tendermint/tendermint/rpc/core/types"
 
@@ -127,20 +126,13 @@ func (s *CosmosStatus) Check() {
 							panic(err)
 						}
 					} else {
-						res, err := RCtx.Cosmos.GrpcClient.QuerySync(types.RequestQuery{
-							Data: ccmkeeper.GetDoneTxKey(vArr[i].FromChainId, vArr[i].CCID),
-							Path: ProofPath,
-						})
-						if err != nil {
-							panic(err)
-						}
-						if res.GetValue() != nil {
+						if res, _ := RCtx.Cosmos.RpcClient.ABCIQuery(c.Background(), ProofPath, ccmkeeper.GetDoneTxKey(vArr[i].FromChainId, vArr[i].CCID)); res != nil && res.Response.GetValue() != nil {
 							log.Infof("[Cosmos Status] this poly tx %s is already committed, "+
 								"so delete it cosmos_txhash %s: (from_chain_id: %d, ccid: %s)",
 								vArr[i].Txhash, v.String(), vArr[i].FromChainId, hex.EncodeToString(vArr[i].CCID))
 						} else {
 							log.Errorf("[Cosmos Status] cosmso tx %s is confirmed on block (height: %d) "+
-								"and failed (Log: %s). ", v.String(), res.Height, res.Log)
+								"and failed (Log: %s). ", v.String(), res.Response.Height, res.Response.Log)
 						}
 					}
 				}

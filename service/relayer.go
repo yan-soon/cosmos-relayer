@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmcoretypes "github.com/tendermint/tendermint/rpc/core/types"
 
 	clienttx "github.com/cosmos/cosmos-sdk/client/tx"
@@ -244,11 +243,11 @@ func handlePolyHdr(hdr *coretypes.Header) {
 		if resTx == nil {
 			continue
 		}
-		info, err := ctx.Cosmos.GrpcClient.InfoSync(abcitypes.RequestInfo{})
+		status, err := ctx.Cosmos.RpcClient.Status(c.Background())
 		if err != nil {
 			panic(err)
 		}
-		if resTx.TxResponse.Height > 0 && info.LastBlockHeight > resTx.TxResponse.Height {
+		if resTx.TxResponse.Height > 0 && status.SyncInfo.LatestBlockHeight > resTx.TxResponse.Height {
 			break
 		}
 		if startTime.Add(100 * time.Millisecond); startTime.Second() > ctx.Conf.ConfirmTimeout {
