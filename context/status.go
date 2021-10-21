@@ -126,7 +126,11 @@ func (s *CosmosStatus) Check() {
 							panic(err)
 						}
 					} else {
-						if res, _ := RCtx.Cosmos.RpcClient.ABCIQuery(c.Background(), ProofPath, ccmkeeper.GetDoneTxKey(vArr[i].FromChainId, vArr[i].CCID)); res != nil && res.Response.GetValue() != nil {
+						res, err := RCtx.Cosmos.RpcClient.ABCIQuery(c.Background(), ProofPath, ccmkeeper.GetDoneTxKey(vArr[i].FromChainId, vArr[i].CCID))
+						if err != nil {
+							panic(err)
+						}
+						if res.Response.GetValue() != nil {
 							log.Infof("[Cosmos Status] this poly tx %s is already committed, "+
 								"so delete it cosmos_txhash %s: (from_chain_id: %d, ccid: %s)",
 								vArr[i].Txhash, v.String(), vArr[i].FromChainId, hex.EncodeToString(vArr[i].CCID))

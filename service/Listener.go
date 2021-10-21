@@ -188,7 +188,10 @@ func checkPolyHeight(h, epochHeight uint32) (int, error) {
 				// check if this cross-chain tx already committed on COSMOS
 				key := ccmkeeper.GetDoneTxKey(merkleValue.FromChainID, merkleValue.MakeTxParam.CrossChainID)
 				res, err := ctx.Cosmos.RpcClient.ABCIQuery(c.Background(), context.ProofPath, key)
-				if err != nil || res == nil || res.Response.GetValue() != nil {
+				if err != nil {
+					panic(err)
+				}
+				if res.Response.GetValue() != nil {
 					continue
 				}
 
@@ -435,8 +438,11 @@ func checkCosmosHeight(h int64, hdrToVerifyProof *hscosmos.CosmosHeader, infoArr
 		// get proof for every tx, and add them to txArr prepared to commit
 		for _, tx := range res.Txs {
 			hash := getKeyHash(tx)
-			res, _ := ctx.Cosmos.RpcClient.ABCIQueryWithOptions(c.Background(), context.ProofPath, ccmkeeper.GetCrossChainTxKey(hash),
+			res, err := ctx.Cosmos.RpcClient.ABCIQueryWithOptions(c.Background(), context.ProofPath, ccmkeeper.GetCrossChainTxKey(hash),
 				client.ABCIQueryOptions{Prove: true, Height: heightToGetProof})
+			if err != nil {
+				panic(err)
+			}
 			if res == nil || res.Response.GetValue() == nil {
 				// If get the proof failed, that could means the header of height `heightToGetProof`
 				// is already pruned. And the cosmos node already delete the data on
@@ -519,7 +525,10 @@ func reproveCosmosTx(infoArr []*context.CosmosInfo, hdrToVerifyProof *hscosmos.C
 		hash := getKeyHash(tx)
 		res, err := ctx.Cosmos.RpcClient.ABCIQueryWithOptions(c.Background(), context.ProofPath, ccmkeeper.GetCrossChainTxKey(hash),
 			client.ABCIQueryOptions{Prove: true, Height: hdrToVerifyProof.Header.Height - 1})
-		if err != nil || res == nil || res.Response.GetValue() == nil {
+		if err != nil {
+			panic(err)
+		}
+		if res == nil || res.Response.GetValue() == nil {
 			log.Errorf("[ReProve] failed to query proof and could be something wrong with RPC: %v", err)
 			return infoArr
 		}
