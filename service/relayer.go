@@ -293,18 +293,21 @@ func sendCosmosTx(msgs []sdk.Msg) (res *tmcoretypes.ResultBroadcastTx, seq uint6
 	}
 
 	// Adapted from: https://docs.cosmos.network/master/run-node/txs.html#broadcasting-a-transaction-3
+	// cosmos-sdk/x/auth/ante/testutil_test.go
 
 	// First round: we gather all the signer infos. We use the "set empty
 	// signature" hack to do that.
-	sigV2 := signingtypes.SignatureV2{
+	signMode := ctx.Cosmos.TxConfig.SignModeHandler().DefaultMode()
+	sigData := signingtypes.SingleSignatureData{
+		SignMode:  signMode,
+		Signature: nil,
+	}
+	sig := signingtypes.SignatureV2{
 		PubKey: ctx.Cosmos.PrivKey.PubKey(),
-		Data: &signingtypes.SingleSignatureData{
-			SignMode:  ctx.Cosmos.TxConfig.SignModeHandler().DefaultMode(),
-			Signature: nil,
-		},
+		Data: &sigData,
 		Sequence: seq,
 	}
-	err = txBuilder.SetSignatures(sigV2)
+	err = txBuilder.SetSignatures(sig)
 	if err != nil {
 		return
 	}
@@ -316,15 +319,15 @@ func sendCosmosTx(msgs []sdk.Msg) (res *tmcoretypes.ResultBroadcastTx, seq uint6
 		Sequence:      seq,
 	}
 
-	sigV2, err = clienttx.SignWithPrivKey(
-		ctx.Cosmos.TxConfig.SignModeHandler().DefaultMode(), signerData,
+	sig, err = clienttx.SignWithPrivKey(
+		signMode, signerData,
 		txBuilder, ctx.Cosmos.PrivKey, ctx.Cosmos.TxConfig, seq)
 
 	if err != nil {
 		return
 	}
 
-	err = txBuilder.SetSignatures(sigV2)
+	err = txBuilder.SetSignatures(sig)
 	txn := txBuilder.GetTx()
 	txBytes, err := ctx.Cosmos.TxConfig.TxEncoder()(txn)
 	if err != nil {
@@ -332,31 +335,14 @@ func sendCosmosTx(msgs []sdk.Msg) (res *tmcoretypes.ResultBroadcastTx, seq uint6
 	}
 
 	for {
-		txClient := txtypes.NewServiceClient(ctx.Cosmos.GrpcConn)
-		res, err := txClient.BroadcastTx(
-			c.Background(),
-			&txtypes.BroadcastTxRequest{
-				Mode:    txtypes.BroadcastMode_BROADCAST_MODE_SYNC,
-				TxBytes: txBytes, // Proto-binary of the signed transaction, see previous step.
-			},
-		)
+		res, err := ctx.Cosmos.RpcClient.BroadcastTxSync(c.Background(), txBytes)
 		if err != nil {
-			if strings.Contains(err.Error(), context.BroadcastConnTimeOut) {
-				context.SleepSecs(10)
-				continue
-			}
-			return nil, seq, fmt.Errorf("failed to broadcast tx: (error: %v, raw tx: %x)", err, txn)
+			panic(fmt.Sprintf("failed to broadcast tx with error: %v", err))
 		}
-		if res.TxResponse.Code != 0 {
-			if strings.Contains(res.TxResponse.RawLog, context.SeqErr) {
-				context.SleepSecs(1)
-				continue
-			}
-			return nil, seq, fmt.Errorf("failed to check tx: (code: %d, sequence: %d, log: %s)",
-				res.TxResponse.Code, seq, res.TxResponse.RawLog)
-		} else {
-			break
+		if res.Code != 0 {
+			panic(fmt.Sprintf("failed to broadcast tx with non-zero code: %v", res))
 		}
+		break
 	}
 
 	return
