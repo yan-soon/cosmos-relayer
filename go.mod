@@ -3,7 +3,7 @@ module github.com/polynetwork/cosmos-relayer
 go 1.16
 
 require (
-	github.com/Switcheo/polynetwork-cosmos v0.0.0-20210609103003-8471a1901d49
+	github.com/Switcheo/polynetwork-cosmos v0.0.0-20210929081223-d1db4c411745
 	github.com/boltdb/bolt v1.3.1
 	github.com/cosmos/cosmos-sdk v0.42.6
 	github.com/ontio/ontology v1.11.1-0.20200812075204-26cf1fa5dd47
