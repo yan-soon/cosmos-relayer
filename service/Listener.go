@@ -391,10 +391,8 @@ func beforeCosmosListen() (int64, *time.Ticker, error) {
 // get proof, relayer update `rightPtr` and return.
 func checkCosmosHeight(h int64, hdrToVerifyProof *hscosmos.CosmosHeader, infoArr []*context.CosmosInfo, rightPtr *int64) ([]*context.CosmosInfo, error) {
 	query := getTxQuery(h - 1)
-	var page, perPage *int
-	*page = 1
-	*perPage = context.PerPage
-	res, err := ctx.Cosmos.RpcClient.TxSearch(c.TODO(), query, true, page, perPage, "asc")
+	page, perPage := 1, context.PerPage
+	res, err := ctx.Cosmos.RpcClient.TxSearch(c.TODO(), query, true, &page, &perPage, "asc")
 	if err != nil {
 		return infoArr, err
 	}
