@@ -429,7 +429,7 @@ func checkCosmosHeight(h int64, hdrToVerifyProof *hscosmos.CosmosHeader, infoArr
 	for p := 1; p <= pages; p++ {
 		// already have page 1
 		if p > 1 {
-			if res, err = ctx.Cosmos.RpcClient.TxSearch(c.TODO(), query, true, &p, perPage, "asc"); err != nil {
+			if res, err = ctx.Cosmos.RpcClient.TxSearch(c.TODO(), query, true, &p, &perPage, "asc"); err != nil {
 				return infoArr, err
 			}
 		}
