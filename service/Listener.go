@@ -40,6 +40,7 @@ import (
 	ccmkeeper "github.com/Switcheo/polynetwork-cosmos/x/ccm/keeper"
 	headersynctypes "github.com/Switcheo/polynetwork-cosmos/x/headersync/types"
 	"github.com/tendermint/tendermint/rpc/client"
+	"github.com/cosmos/cosmos-sdk/crypto/codec"
 )
 
 var (
@@ -591,12 +592,17 @@ func getValidators(h int64) ([]*context.CosmosValidator, error) {
 		if len(res.Validators) == 0 {
 			return vSet, nil
 		}
-		for i := range vSet {
+
+		for i := range res.Validators {
+			pk, err := codec.FromTmPubKeyInterface(res.Validators[i].PubKey)
+			if err != nil {
+				panic(err)
+			}
 			vSet = append(vSet, &context.CosmosValidator{
-				Address:          vSet[i].Address,
-				PubKey:           vSet[i].PubKey,
-				VotingPower:      vSet[i].VotingPower,
-				ProposerPriority: vSet[i].ProposerPriority,
+				Address:          res.Validators[i].Address,
+				PubKey:           pk,
+				VotingPower:      res.Validators[i].VotingPower,
+				ProposerPriority: res.Validators[i].ProposerPriority,
 			})
 		}
 		page++
