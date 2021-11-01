@@ -33,6 +33,7 @@ import (
 	authtxtypes "github.com/cosmos/cosmos-sdk/x/auth/tx"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 
+	tmcrypto "github.com/tendermint/tendermint/crypto"
 	rpchttp "github.com/tendermint/tendermint/rpc/client/http"
 	rpctypes "github.com/tendermint/tendermint/rpc/core/types"
 
@@ -40,10 +41,10 @@ import (
 	"github.com/polynetwork/poly/core/types"
 	"github.com/polynetwork/poly/native/service/header_sync/cosmos"
 
-	"github.com/polynetwork/cosmos-relayer/db"
-	"github.com/polynetwork/cosmos-relayer/log"
 	headersynctypes "github.com/Switcheo/polynetwork-cosmos/x/headersync/types"
 	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
+	"github.com/polynetwork/cosmos-relayer/db"
+	"github.com/polynetwork/cosmos-relayer/log"
 )
 
 type InfoType int
@@ -60,6 +61,7 @@ var (
 
 func NewCodecForRelayer() *codec.LegacyAmino {
 	cdc := codec.NewLegacyAmino()
+	cdc.RegisterInterface((*tmcrypto.PubKey)(nil), nil)
 	headersynctypes.RegisterCodec(cdc)
 	cryptocodec.RegisterCrypto(cdc)
 	return cdc
