@@ -18,6 +18,6 @@ replace google.golang.org/grpc => google.golang.org/grpc v1.33.2
 
 replace github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 
-replace github.com/cosmos/cosmos-sdk => github.com/Switcheo/cosmos-sdk v0.42.4-0.20210614065833-8f123154d4c8
+replace github.com/cosmos/cosmos-sdk => github.com/Switcheo/cosmos-sdk v0.42.4-0.20210831093444-8d0abdf21f60
 
 replace github.com/polynetwork/poly => github.com/Switcheo/poly v0.0.0-20210708043258-47d107cc1dc3

@@ -42,6 +42,8 @@ import (
 
 	"github.com/polynetwork/cosmos-relayer/db"
 	"github.com/polynetwork/cosmos-relayer/log"
+	headersynctypes "github.com/Switcheo/polynetwork-cosmos/x/headersync/types"
+	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
 )
 
 type InfoType int
@@ -56,6 +58,13 @@ var (
 	RCtx = &Ctx{}
 )
 
+func NewCodecForRelayer() *codec.LegacyAmino {
+	cdc := codec.NewLegacyAmino()
+	headersynctypes.RegisterCodec(cdc)
+	cryptocodec.RegisterCrypto(cdc)
+	return cdc
+}
+
 func InitCtx(conf *Conf) (err error) {
 	RCtx.Conf = conf
 	setCosmosConfig(conf.CosmosAddrPrefix)
@@ -65,8 +74,7 @@ func InitCtx(conf *Conf) (err error) {
 	RCtx.ToPoly = make(chan *CosmosInfo, ChanBufSize)
 
 	// legacy cdc
-	RCtx.Cosmos.Cdc = codec.NewLegacyAmino()
-	log.Tracef("initializing")
+	RCtx.Cosmos.Cdc = NewCodecForRelayer()
 
 	// init http rpc client for tendermint for unmigrated stuff
 	if RCtx.Cosmos.RpcClient, err = rpchttp.New(conf.CosmosRpcAddr, "/websocket"); err != nil {
