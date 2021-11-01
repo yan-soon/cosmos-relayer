@@ -33,13 +33,12 @@ import (
 	authtxtypes "github.com/cosmos/cosmos-sdk/x/auth/tx"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 
-	tmcrypto "github.com/tendermint/tendermint/crypto"
 	rpchttp "github.com/tendermint/tendermint/rpc/client/http"
 	rpctypes "github.com/tendermint/tendermint/rpc/core/types"
+	tmtypes "github.com/tendermint/tendermint/types"
 
 	polysdk "github.com/polynetwork/poly-go-sdk"
 	"github.com/polynetwork/poly/core/types"
-	"github.com/polynetwork/poly/native/service/header_sync/cosmos"
 
 	headersynctypes "github.com/Switcheo/polynetwork-cosmos/x/headersync/types"
 	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
@@ -61,7 +60,6 @@ var (
 
 func NewCodecForRelayer() *codec.LegacyAmino {
 	cdc := codec.NewLegacyAmino()
-	cdc.RegisterInterface((*tmcrypto.PubKey)(nil), nil)
 	headersynctypes.RegisterCodec(cdc)
 	cryptocodec.RegisterCrypto(cdc)
 	return cdc
@@ -227,6 +225,19 @@ type PolyTx struct {
 	FromChainId uint64
 }
 
+type CosmosHeader struct {
+	Header  tmtypes.Header
+	Commit  *tmtypes.Commit
+	Valsets []*CosmosValidator
+}
+
+type CosmosValidator struct {
+	Address          tmtypes.Address    `json:"address"`
+	PubKey           cryptotypes.PubKey `json:"pub_key"`
+	VotingPower      int64              `json:"voting_power"`
+	ProposerPriority int64              `json:"proposer_priority"`
+}
+
 type CosmosInfo struct {
 	// type 1 means header and tx; type 2 means only header;
 	Type InfoType
@@ -238,7 +249,7 @@ type CosmosInfo struct {
 	Tx *CosmosTx
 
 	// header part
-	Hdrs []*cosmos.CosmosHeader
+	Hdrs []*CosmosHeader
 }
 
 type CosmosTx struct {

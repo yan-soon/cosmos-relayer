@@ -31,7 +31,6 @@ import (
 	"github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
 	polysdk "github.com/polynetwork/poly-go-sdk"
-	hscosmos "github.com/polynetwork/poly/native/service/header_sync/cosmos"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx"
@@ -191,7 +190,7 @@ func TestCommitGenesis(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ch := &hscosmos.CosmosHeader{
+	ch := &context.CosmosHeader{
 		Header:  *res.Header,
 		Commit:  res.Commit,
 		Valsets: vals,

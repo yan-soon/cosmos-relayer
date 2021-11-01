@@ -34,7 +34,6 @@ import (
 
 	client "github.com/polynetwork/poly-go-sdk/client"
 	coretypes "github.com/polynetwork/poly/core/types"
-	hsc "github.com/polynetwork/poly/native/service/header_sync/cosmos"
 
 	ccmtypes "github.com/Switcheo/polynetwork-cosmos/x/ccm/types"
 	headersynctypes "github.com/Switcheo/polynetwork-cosmos/x/headersync/types"
@@ -77,7 +76,7 @@ func ToPolyRoutine() {
 // Process cosmos-headers msg. This function would not return before our
 // Ploygon tx committing headers confirmed. This guarantee that the next
 // cross-chain txs next to relay can be proved on Poly.
-func handleCosmosHdrs(headers []*hsc.CosmosHeader) error {
+func handleCosmosHdrs(headers []*context.CosmosHeader) error {
 	if ctx.PolyStatus.Len() > 0 {
 		ctx.PolyStatus.IsBlocked = true
 		ctx.PolyStatus.CosmosEpochHeight = headers[0].Header.Height
@@ -85,7 +84,7 @@ func handleCosmosHdrs(headers []*hsc.CosmosHeader) error {
 		ctx.PolyStatus.Wg.Add(1)
 	}
 	for i := 0; i < len(headers); i += context.HdrLimitPerBatch {
-		var hdrs []*hsc.CosmosHeader
+		var hdrs []*context.CosmosHeader
 		if i+context.HdrLimitPerBatch > len(headers) {
 			hdrs = headers[i:]
 		} else {
@@ -147,7 +146,7 @@ func handleCosmosHdrs(headers []*hsc.CosmosHeader) error {
 }
 
 // Relay COSMOS cross-chain tx to polygon.
-func handleCosmosTx(tx *context.CosmosTx, hdr *hsc.CosmosHeader) {
+func handleCosmosTx(tx *context.CosmosTx, hdr *context.CosmosHeader) {
 	raw, err := ctx.Cosmos.Cdc.MarshalBinaryBare(*hdr)
 	if err != nil {
 		panic(fmt.Errorf("failed to marshal cosmos header %s: %v", hdr.Commit.BlockID.Hash.String(), err))
@@ -303,8 +302,8 @@ func sendCosmosTx(msgs []sdk.Msg) (res *tmcoretypes.ResultBroadcastTx, seq uint6
 		Signature: nil,
 	}
 	sig := signingtypes.SignatureV2{
-		PubKey: ctx.Cosmos.PrivKey.PubKey(),
-		Data: &sigData,
+		PubKey:   ctx.Cosmos.PrivKey.PubKey(),
+		Data:     &sigData,
 		Sequence: seq,
 	}
 	err = txBuilder.SetSignatures(sig)

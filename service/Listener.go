@@ -36,7 +36,6 @@ import (
 
 	"github.com/tendermint/tendermint/crypto/merkle"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
-	tmtypes "github.com/tendermint/tendermint/types"
 
 	ccmkeeper "github.com/Switcheo/polynetwork-cosmos/x/ccm/keeper"
 	headersynctypes "github.com/Switcheo/polynetwork-cosmos/x/headersync/types"
@@ -311,7 +310,7 @@ func CosmosListen() {
 			infoArr := make([]*context.CosmosInfo, 1)
 			infoArr[0] = &context.CosmosInfo{
 				Type: context.TyHeader,
-				Hdrs: make([]*hscosmos.CosmosHeader, 0),
+				Hdrs: make([]*context.CosmosHeader, 0),
 			}
 			for h := left + 1; h <= right; h++ {
 				infoArrTemp, err := checkCosmosHeight(h, hdr, infoArr, &right)
@@ -389,7 +388,7 @@ func beforeCosmosListen() (int64, *time.Ticker, error) {
 // Put header to `hdrArr` and txs to `txArr`. Get proof from height `heightToGetProof`.
 // `headersToRelay` record all hdrs need to relay. When need to update new height to
 // get proof, relayer update `rightPtr` and return.
-func checkCosmosHeight(h int64, hdrToVerifyProof *hscosmos.CosmosHeader, infoArr []*context.CosmosInfo, rightPtr *int64) ([]*context.CosmosInfo, error) {
+func checkCosmosHeight(h int64, hdrToVerifyProof *context.CosmosHeader, infoArr []*context.CosmosInfo, rightPtr *int64) ([]*context.CosmosInfo, error) {
 	query := getTxQuery(h - 1)
 	page, perPage := 1, context.PerPage
 	res, err := ctx.Cosmos.RpcClient.TxSearch(c.TODO(), query, true, &page, &perPage, "asc")
@@ -406,7 +405,7 @@ func checkCosmosHeight(h int64, hdrToVerifyProof *hscosmos.CosmosHeader, infoArr
 		if err != nil {
 			return infoArr, err
 		}
-		hdr := &hscosmos.CosmosHeader{
+		hdr := &context.CosmosHeader{
 			Header:  *rc.Header,
 			Commit:  rc.Commit,
 			Valsets: vSet,
@@ -500,7 +499,7 @@ func checkCosmosHeight(h int64, hdrToVerifyProof *hscosmos.CosmosHeader, infoArr
 					Proof:       proof,
 					PVal:        pv,
 				},
-				Hdrs: []*hscosmos.CosmosHeader{hdrToVerifyProof},
+				Hdrs: []*context.CosmosHeader{hdrToVerifyProof},
 			})
 		}
 	}
@@ -508,7 +507,7 @@ func checkCosmosHeight(h int64, hdrToVerifyProof *hscosmos.CosmosHeader, infoArr
 	return infoArr, nil
 }
 
-func reproveCosmosTx(infoArr []*context.CosmosInfo, hdrToVerifyProof *hscosmos.CosmosHeader) []*context.CosmosInfo {
+func reproveCosmosTx(infoArr []*context.CosmosInfo, hdrToVerifyProof *context.CosmosHeader) []*context.CosmosInfo {
 	arr, err := ctx.Db.GetCosmosTxReproving()
 	if err != nil {
 		panic(fmt.Errorf("[ReProve] failed to get reproving cosmos tx: %v", err))
@@ -565,7 +564,7 @@ func reproveCosmosTx(infoArr []*context.CosmosInfo, hdrToVerifyProof *hscosmos.C
 				Proof:       proof,
 				PVal:        pv,
 			},
-			Hdrs: []*hscosmos.CosmosHeader{hdrToVerifyProof},
+			Hdrs: []*context.CosmosHeader{hdrToVerifyProof},
 		})
 		ctx.Db.SetCosmosTxTxInChan(tx.Hash)
 	}
@@ -576,10 +575,10 @@ func getTxQuery(h int64) string {
 	return fmt.Sprintf("tx.height=%d AND make_from_cosmos_proof.status='1'", h)
 }
 
-func getValidators(h int64) ([]*tmtypes.Validator, error) {
+func getValidators(h int64) ([]*context.CosmosValidator, error) {
 	page := 1
 	perPage := 100
-	vSet := make([]*tmtypes.Validator, 0)
+	vSet := make([]*context.CosmosValidator, 0)
 	for {
 		res, err := ctx.Cosmos.RpcClient.Validators(c.TODO(), &h, &page, &perPage)
 		if err != nil {
@@ -592,12 +591,19 @@ func getValidators(h int64) ([]*tmtypes.Validator, error) {
 		if len(res.Validators) == 0 {
 			return vSet, nil
 		}
-		vSet = append(vSet, res.Validators...)
+		for i := range vSet {
+			vSet = append(vSet, &context.CosmosValidator{
+				Address:          vSet[i].Address,
+				PubKey:           vSet[i].PubKey,
+				VotingPower:      vSet[i].VotingPower,
+				ProposerPriority: vSet[i].ProposerPriority,
+			})
+		}
 		page++
 	}
 }
 
-func getCosmosHdr(h int64) (*hscosmos.CosmosHeader, error) {
+func getCosmosHdr(h int64) (*context.CosmosHeader, error) {
 	rc, err := ctx.Cosmos.RpcClient.Commit(c.TODO(), &h)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Commit of height %d: %v", h, err)
@@ -606,7 +612,7 @@ func getCosmosHdr(h int64) (*hscosmos.CosmosHeader, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Validators of height %d: %v", h, err)
 	}
-	return &hscosmos.CosmosHeader{
+	return &context.CosmosHeader{
 		Header:  *rc.Header,
 		Commit:  rc.Commit,
 		Valsets: vSet,
