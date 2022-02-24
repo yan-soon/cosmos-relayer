@@ -333,15 +333,14 @@ func sendCosmosTx(msgs []sdk.Msg) (res *tmcoretypes.ResultBroadcastTx, seq uint6
 		return
 	}
 
-	for {
-		res, err := ctx.Cosmos.RpcClient.BroadcastTxSync(c.Background(), txBytes)
-		if err != nil {
-			panic(fmt.Sprintf("failed to broadcast tx with error: %v", err))
-		}
-		if res.Code != 0 {
-			panic(fmt.Sprintf("failed to broadcast tx with non-zero code: %v", res))
-		}
-		break
+	res, err = ctx.Cosmos.RpcClient.BroadcastTxSync(c.Background(), txBytes)
+	if err != nil {
+		err = fmt.Errorf("failed to broadcast tx with error: %v", err)
+		return
+	}
+	if res.Code != 0 {
+		err = fmt.Errorf("failed to broadcast tx with non-zero code: %v", err)
+		return
 	}
 
 	return
