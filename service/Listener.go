@@ -39,8 +39,8 @@ import (
 
 	ccmkeeper "github.com/Switcheo/polynetwork-cosmos/x/ccm/keeper"
 	headersynctypes "github.com/Switcheo/polynetwork-cosmos/x/headersync/types"
-	"github.com/tendermint/tendermint/rpc/client"
 	"github.com/cosmos/cosmos-sdk/crypto/codec"
+	"github.com/tendermint/tendermint/rpc/client"
 )
 
 var (
@@ -314,6 +314,7 @@ func CosmosListen() {
 				Hdrs: make([]*context.CosmosHeader, 0),
 			}
 			for h := left + 1; h <= right; h++ {
+				log.Tracef("[ListenCosmos] checking cosmos height %d", h)
 				infoArrTemp, err := checkCosmosHeight(h, hdr, infoArr, &right)
 				if err != nil {
 					// If error happen, we should check this height again.

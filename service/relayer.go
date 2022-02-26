@@ -68,6 +68,7 @@ func ToPolyRoutine() {
 				if err := ctx.Db.SetCosmosHeight(val.Height); err != nil {
 					log.Errorf("failed to update cosmos height: %v", err)
 				}
+				log.Tracef("update cosmos height %d to db", val.Height)
 			}()
 		}
 	}
