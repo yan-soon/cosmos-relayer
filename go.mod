@@ -3,7 +3,7 @@ module github.com/polynetwork/cosmos-relayer
 go 1.16
 
 require (
-	github.com/Switcheo/polynetwork-cosmos v0.0.0-20210929081223-d1db4c411745
+	github.com/Switcheo/polynetwork-cosmos v0.0.0-20220405083937-082c1556eb65
 	github.com/boltdb/bolt v1.3.1
 	github.com/cosmos/cosmos-sdk v0.42.6
 	github.com/ontio/ontology v1.11.1-0.20200812075204-26cf1fa5dd47
@@ -11,7 +11,7 @@ require (
 	github.com/polynetwork/poly-go-sdk v0.0.0-20210114120411-3dcba035134f
 	github.com/stretchr/testify v1.7.0
 	github.com/tendermint/tendermint v0.34.11
-	google.golang.org/grpc v1.40.0
+	google.golang.org/grpc v1.45.0
 )
 
 replace google.golang.org/grpc => google.golang.org/grpc v1.33.2
