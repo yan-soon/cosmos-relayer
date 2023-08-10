@@ -112,15 +112,16 @@ func (s *CosmosStatus) Check() {
 		for i, v := range kArr {
 			res, err := client.GetTx(c.Background(), &tx.GetTxRequest{Hash: v.String()})
 			if err != nil {
-				panic(err)
+				log.Infof("[To Carbon] could not get carbon tx %s: %v", err)
+				continue
 			}
 			if res.TxResponse.Height > 0 {
 				if res.TxResponse.Code == 0 {
-					log.Infof("[Cosmos Status] cosmso tx %s is confirmed on block (height: %d) and success. ",
+					log.Infof("[To Carbon] carbon tx %s is confirmed on block (height: %d) and success.",
 						v.String(), res.TxResponse.Height)
 				} else {
 					if strings.Contains(res.TxResponse.RawLog, CosmosTxNotInEpoch) {
-						log.Debugf("[Cosmos Status] cosmso tx %s is failed and this proof %s need reprove. ",
+						log.Debugf("[To Carbon] carbon tx %s is failed and this proof %s need reprove. ",
 							v.String(), vArr[i].Proof)
 						if err := RCtx.Db.SetPolyTxReproving(vArr[i].Txhash, vArr[i].Proof, vArr[i].Hdr); err != nil {
 							panic(err)
@@ -131,11 +132,11 @@ func (s *CosmosStatus) Check() {
 							panic(err)
 						}
 						if res.Response.GetValue() != nil {
-							log.Infof("[Cosmos Status] this poly tx %s is already committed, "+
+							log.Infof("[To Carbon] this poly tx %s is already committed, "+
 								"so delete it cosmos_txhash %s: (from_chain_id: %d, ccid: %s)",
 								vArr[i].Txhash, v.String(), vArr[i].FromChainId, hex.EncodeToString(vArr[i].CCID))
 						} else {
-							log.Errorf("[Cosmos Status] cosmso tx %s is confirmed on block (height: %d) "+
+							log.Errorf("[To Carbon] carbon tx %s is confirmed on block (height: %d) "+
 								"and failed (Log: %s). ", v.String(), res.Response.Height, res.Response.Log)
 						}
 					}
@@ -164,7 +165,7 @@ func (s *CosmosStatus) Show() {
 			return true
 		})
 		if l > 0 {
-			log.Infof("[Cosmos Status] %s ", fmt.Sprintf(str, strings.Join(strs, "\n"), l))
+			log.Infof("[To Carbon] %s ", fmt.Sprintf(str, strings.Join(strs, "\n"), l))
 		}
 	}
 }

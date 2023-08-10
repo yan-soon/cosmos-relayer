@@ -306,6 +306,9 @@ func CosmosListen() {
 				lastRight = right
 				continue
 			}
+			if right-left > ctx.Conf.CosmosMaxBlockSync {
+				right = left + ctx.Conf.CosmosMaxBlockSync
+			}
 
 			// let first element of infoArr be the info for epoch switching headers.
 			infoArr := make([]*context.CosmosInfo, 1)
@@ -313,6 +316,7 @@ func CosmosListen() {
 				Type: context.TyHeader,
 				Hdrs: make([]*context.CosmosHeader, 0),
 			}
+			log.Tracef("[ListenCosmos] syncing cosmos heights %d to %d", left, right)
 			for h := left + 1; h <= right; h++ {
 				log.Tracef("[ListenCosmos] checking cosmos height %d", h)
 				infoArrTemp, err := checkCosmosHeight(h, hdr, infoArr, &right)
@@ -416,7 +420,7 @@ func checkCosmosHeight(h int64, hdrToVerifyProof *context.CosmosHeader, infoArr 
 			append(append([]byte(hscommon.EPOCH_SWITCH), utils.GetUint64Bytes(ctx.Conf.SideChainId)...),
 				utils.GetUint64Bytes(uint64(h))...))
 		// check if this header is not committed on Poly
-		if val == nil || len(val) == 0 {
+		if len(val) == 0 {
 			infoArr[0].Hdrs = append(infoArr[0].Hdrs, hdr)
 		}
 	}
@@ -489,7 +493,7 @@ func checkCosmosHeight(h int64, hdrToVerifyProof *context.CosmosHeader, infoArr 
 			val, _ := ctx.Poly.GetStorage(utils.CrossChainManagerContractAddress.ToHexString(),
 				append(append([]byte(ccmcommon.DONE_TX), utils.GetUint64Bytes(ctx.Conf.SideChainId)...),
 					txParam.CrossChainID...))
-			if val != nil && len(val) != 0 {
+			if len(val) != 0 {
 				continue
 			}
 			tx.TxResult.Data = txParam.CrossChainID

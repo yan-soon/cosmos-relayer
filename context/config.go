@@ -33,6 +33,7 @@ type Conf struct {
 	CosmosAddrPrefix     string `json:"cosmos_address_prefix"`
 	CosmosTxFee          string `json:"cosmos_tx_fee"`
 	CosmosGasLimit       uint64 `json:"cosmos_gas_limit"`
+	CosmosMaxBlockSync   int64  `json:"cosmos_max_block_sync"`
 
 	PolyRpcAddr        string `json:"poly_rpc_addr"`
 	PolyWallet         string `json:"poly_wallet"`
