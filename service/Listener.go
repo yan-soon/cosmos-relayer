@@ -301,13 +301,13 @@ func CosmosListen() {
 					right, ctx.Conf.CosmosListenInterval, err)
 				continue
 			}
+			if right-left > ctx.Conf.CosmosMaxBlockSync {
+				right = left + ctx.Conf.CosmosMaxBlockSync
+			}
 			if !bytes.Equal(hdr.Header.ValidatorsHash, hdr.Header.NextValidatorsHash) {
 				log.Debugf("[ListenCosmos] header at %d is epoch switching point, so continue loop", hdr.Header.Height)
 				lastRight = right
 				continue
-			}
-			if right-left > ctx.Conf.CosmosMaxBlockSync {
-				right = left + ctx.Conf.CosmosMaxBlockSync
 			}
 
 			// let first element of infoArr be the info for epoch switching headers.
