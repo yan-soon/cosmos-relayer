@@ -22,16 +22,15 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"path"
-	"strings"
-	"sync"
-
 	"github.com/boltdb/bolt"
-	tb "github.com/cometbft/cometbft/libs/bytes"
-	coretypes "github.com/cometbft/cometbft/rpc/core/types"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/polynetwork/poly/common"
 	"github.com/polynetwork/poly/core/types"
+	tb "github.com/tendermint/tendermint/libs/bytes"
+	"github.com/tendermint/tendermint/rpc/core/types"
+	"path"
+	"strings"
+	"sync"
 )
 
 var (

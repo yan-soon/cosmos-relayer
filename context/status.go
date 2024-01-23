@@ -18,21 +18,19 @@
 package context
 
 import (
-	"context"
 	"encoding/hex"
 	"fmt"
-	"strings"
-	"sync"
-	"time"
-
-	"github.com/cometbft/cometbft/libs/bytes"
-	rpctypes "github.com/cometbft/cometbft/rpc/core/types"
 	"github.com/polynetwork/cosmos-poly-module/ccm"
 	"github.com/polynetwork/cosmos-relayer/db"
 	"github.com/polynetwork/cosmos-relayer/log"
 	"github.com/polynetwork/poly/common"
 	ccmc "github.com/polynetwork/poly/native/service/cross_chain_manager/common"
 	"github.com/polynetwork/poly/native/service/utils"
+	"github.com/tendermint/tendermint/libs/bytes"
+	rpctypes "github.com/tendermint/tendermint/rpc/core/types"
+	"strings"
+	"sync"
+	"time"
 )
 
 func NewCosmosStatus() (*CosmosStatus, error) {
@@ -106,7 +104,7 @@ func (s *CosmosStatus) Check() {
 			s.Wg.Done()
 		}
 		for i, v := range kArr {
-			resTx, _ = RCtx.CMRpcCli.Tx(context.Background(), []byte(vArr[i].Txhash), false)
+			resTx, _ = RCtx.CMRpcCli.Tx(v, false)
 			if resTx == nil {
 				continue
 			}
@@ -122,7 +120,7 @@ func (s *CosmosStatus) Check() {
 							panic(err)
 						}
 					} else {
-						if res, _ := RCtx.CMRpcCli.ABCIQuery(context.Background(), ProofPath, ccm.GetDoneTxKey(vArr[i].FromChainId, vArr[i].CCID)); res != nil && res.Response.GetValue() != nil {
+						if res, _ := RCtx.CMRpcCli.ABCIQuery(ProofPath, ccm.GetDoneTxKey(vArr[i].FromChainId, vArr[i].CCID)); res != nil && res.Response.GetValue() != nil {
 							log.Infof("[Cosmos Status] this poly tx %s is already committed, "+
 								"so delete it cosmos_txhash %s: (from_chain_id: %d, ccid: %s)",
 								vArr[i].Txhash, v.String(), vArr[i].FromChainId, hex.EncodeToString(vArr[i].CCID))
