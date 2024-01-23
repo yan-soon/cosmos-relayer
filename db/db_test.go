@@ -21,10 +21,10 @@ import (
 	"os"
 	"testing"
 
+	abcitypes "github.com/cometbft/cometbft/abci/types"
+	tmcoretypes "github.com/cometbft/cometbft/rpc/core/types"
 	pt "github.com/polynetwork/poly/core/types"
 	"github.com/stretchr/testify/assert"
-	abcitypes "github.com/tendermint/tendermint/abci/types"
-	tmcoretypes "github.com/tendermint/tendermint/rpc/core/types"
 )
 
 var (
@@ -40,8 +40,8 @@ var (
 					Type: "gogogo",
 					Attributes: []abcitypes.EventAttribute{
 						{
-							Key:   []byte{1},
-							Value: []byte{2},
+							Key:   "1",
+							Value: "2",
 						},
 					},
 				},

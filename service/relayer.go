@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	tmcoretypes "github.com/tendermint/tendermint/rpc/core/types"
+	tmcoretypes "github.com/cometbft/cometbft/rpc/core/types"
 
 	clienttx "github.com/cosmos/cosmos-sdk/client/tx"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -94,7 +94,7 @@ func handleCosmosHdrs(headers []*context.CosmosHeader) error {
 		info := make([]string, len(hdrs))
 		raw := make([][]byte, len(hdrs))
 		for i, h := range hdrs {
-			r, err := ctx.Cosmos.Cdc.MarshalBinaryBare(*h)
+			r, err := ctx.Cosmos.Cdc.Amino.MarshalBinaryBare(*h)
 			if err != nil {
 				log.Fatalf("[handleCosmosHdr] failed to marshal CosmosHeader: %v", err)
 				return err
@@ -148,7 +148,7 @@ func handleCosmosHdrs(headers []*context.CosmosHeader) error {
 
 // Relay COSMOS cross-chain tx to polygon.
 func handleCosmosTx(tx *context.CosmosTx, hdr *context.CosmosHeader) {
-	raw, err := ctx.Cosmos.Cdc.MarshalBinaryBare(*hdr)
+	raw, err := ctx.Cosmos.Cdc.Amino.MarshalBinaryBare(*hdr)
 	if err != nil {
 		panic(fmt.Errorf("failed to marshal cosmos header %s: %v", hdr.Commit.BlockID.Hash.String(), err))
 	}

@@ -25,9 +25,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cometbft/cometbft/libs/bytes"
+	rpctypes "github.com/cometbft/cometbft/rpc/core/types"
 	"github.com/cosmos/cosmos-sdk/types/tx"
-	"github.com/tendermint/tendermint/libs/bytes"
-	rpctypes "github.com/tendermint/tendermint/rpc/core/types"
 
 	"github.com/polynetwork/poly/common"
 	ccmc "github.com/polynetwork/poly/native/service/cross_chain_manager/common"

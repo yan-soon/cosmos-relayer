@@ -195,7 +195,7 @@ func TestCommitGenesis(t *testing.T) {
 		Commit:  res.Commit,
 		Valsets: vals,
 	}
-	raw, err := ctx.Cosmos.Cdc.MarshalBinaryBare(ch)
+	raw, err := ctx.Cosmos.Cdc.Amino.MarshalBinaryBare(ch)
 	if err != nil {
 		t.Fatal(err)
 	}

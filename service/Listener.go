@@ -34,13 +34,13 @@ import (
 	hscosmos "github.com/polynetwork/poly/native/service/header_sync/cosmos"
 	"github.com/polynetwork/poly/native/service/utils"
 
+	coretypes "github.com/cometbft/cometbft/rpc/core/types"
 	"github.com/tendermint/tendermint/crypto/merkle"
-	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 
 	ccmkeeper "github.com/Switcheo/polynetwork-cosmos/x/ccm/keeper"
 	headersynctypes "github.com/Switcheo/polynetwork-cosmos/x/headersync/types"
+	"github.com/cometbft/cometbft/rpc/client"
 	"github.com/cosmos/cosmos-sdk/crypto/codec"
-	"github.com/tendermint/tendermint/rpc/client"
 )
 
 var (
@@ -478,7 +478,7 @@ func checkCosmosHeight(h int64, hdrToVerifyProof *context.CosmosHeader, infoArr 
 			kp := merkle.KeyPath{}
 			kp = kp.AppendKey([]byte(context.CosmosCrossChainModName), merkle.KeyEncodingURL)
 			kp = kp.AppendKey(res.Response.Key, merkle.KeyEncodingURL)
-			pv, _ := ctx.Cosmos.Cdc.MarshalBinaryBare(&ccmcosmos.CosmosProofValue{
+			pv, _ := ctx.Cosmos.Cdc.Amino.MarshalBinaryBare(&ccmcosmos.CosmosProofValue{
 				Kp:    kp.String(),
 				Value: res.Response.GetValue(),
 			})
@@ -539,7 +539,7 @@ func reproveCosmosTx(infoArr []*context.CosmosInfo, hdrToVerifyProof *context.Co
 		kp := merkle.KeyPath{}
 		kp = kp.AppendKey([]byte(context.CosmosCrossChainModName), merkle.KeyEncodingURL)
 		kp = kp.AppendKey(res.Response.Key, merkle.KeyEncodingURL)
-		pv, _ := ctx.Cosmos.Cdc.MarshalBinaryBare(&ccmcosmos.CosmosProofValue{
+		pv, _ := ctx.Cosmos.Cdc.Amino.MarshalBinaryBare(&ccmcosmos.CosmosProofValue{
 			Kp:    kp.String(),
 			Value: res.Response.GetValue(),
 		})

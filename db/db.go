@@ -27,11 +27,11 @@ import (
 	"sync"
 
 	"github.com/boltdb/bolt"
+	tmbytes "github.com/cometbft/cometbft/libs/bytes"
+	coretypes "github.com/cometbft/cometbft/rpc/core/types"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/polynetwork/poly/common"
 	"github.com/polynetwork/poly/core/types"
-	tmbytes "github.com/tendermint/tendermint/libs/bytes"
-	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 )
 
 var (
