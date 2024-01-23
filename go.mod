@@ -24,3 +24,5 @@ replace github.com/polynetwork/poly => github.com/yan-soon/poly v0.0.0-202401230
 replace github.com/btcsuite/btcd => github.com/btcsuite/btcd v0.22.2
 
 replace github.com/Switcheo/polynetwork-cosmos => github.com/yan-soon/polynetwork-cosmos v0.0.0-20240123083152-f47ec6b689de
+
+replace github.com/ontio/ontology-crypto => github.com/ontio/ontology-crypto v1.2.1
