@@ -18,20 +18,21 @@
 package service
 
 import (
+	goContext "context"
 	"encoding/hex"
 	"fmt"
+	"math"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
 	"github.com/polynetwork/cosmos-poly-module/headersync"
 	"github.com/polynetwork/cosmos-relayer/context"
-	"github.com/polynetwork/poly-go-sdk"
-	"github.com/polynetwork/poly/native/service/header_sync/cosmos"
+	poly_go_sdk "github.com/polynetwork/poly-go-sdk"
 	"github.com/stretchr/testify/assert"
-	"math"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestTOCosmosRoutine(t *testing.T) {
@@ -176,7 +177,7 @@ func TestCommitGenesis(t *testing.T) {
 	//
 	// commit COSMOS genesis header to Poly
 	h := int64(1)
-	res, err := ctx.CMRpcCli.Commit(&h)
+	res, err := ctx.CMRpcCli.Commit(goContext.Background(), &h)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +185,7 @@ func TestCommitGenesis(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ch := &cosmos.CosmosHeader{
+	ch := &context.CosmosHeader{
 		Header:  *res.Header,
 		Commit:  res.Commit,
 		Valsets: vals,
@@ -260,7 +261,7 @@ func TestStartRelay(t *testing.T) {
 	}
 	time.Sleep(5 * time.Second)
 
-	res, err := ctx.CMRpcCli.Tx(resTx.Hash, true)
+	res, err := ctx.CMRpcCli.Tx(goContext.Background(), resTx.Hash, true)
 	if err != nil {
 		t.Fatal(err)
 	}

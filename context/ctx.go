@@ -18,20 +18,22 @@
 package context
 
 import (
+	"context"
 	"fmt"
+	"sync"
+
+	"github.com/cometbft/cometbft/rpc/client"
+	rpchttp "github.com/cometbft/cometbft/rpc/client/http"
+	rpctypes "github.com/cometbft/cometbft/rpc/core/types"
+	tmtypes "github.com/cometbft/cometbft/types"
 	"github.com/cosmos/cosmos-sdk/codec"
 	ctypes "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	"github.com/cosmos/cosmos-sdk/x/auth/exported"
 	"github.com/polynetwork/cosmos-relayer/db"
-	"github.com/polynetwork/poly-go-sdk"
+	poly_go_sdk "github.com/polynetwork/poly-go-sdk"
 	"github.com/polynetwork/poly/core/types"
-	"github.com/polynetwork/poly/native/service/header_sync/cosmos"
 	tcrypto "github.com/tendermint/tendermint/crypto"
-	"github.com/tendermint/tendermint/rpc/client"
-	rpchttp "github.com/tendermint/tendermint/rpc/client/http"
-	rpctypes "github.com/tendermint/tendermint/rpc/core/types"
-	"sync"
 )
 
 type InfoType int
@@ -45,6 +47,12 @@ const (
 var (
 	RCtx = &Ctx{}
 )
+
+type CosmosHeader struct {
+	Header  tmtypes.Header
+	Commit  *tmtypes.Commit
+	Valsets []*tmtypes.Validator
+}
 
 func InitCtx(conf *Conf) error {
 	var (
@@ -73,7 +81,7 @@ func InitCtx(conf *Conf) error {
 	if err != nil {
 		return err
 	}
-	res, err := RCtx.CMRpcCli.ABCIQueryWithOptions(QueryAccPath, rawParam, client.ABCIQueryOptions{Prove: true})
+	res, err := RCtx.CMRpcCli.ABCIQueryWithOptions(context.Background(), QueryAccPath, rawParam, client.ABCIQueryOptions{Prove: true})
 	if err != nil {
 		return err
 	}
@@ -190,7 +198,7 @@ type CosmosInfo struct {
 	Tx *CosmosTx
 
 	// header part
-	Hdrs []*cosmos.CosmosHeader
+	Hdrs []*CosmosHeader
 }
 
 type CosmosTx struct {

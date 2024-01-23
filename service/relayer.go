@@ -18,8 +18,13 @@
 package service
 
 import (
+	goContext "context"
 	"encoding/hex"
 	"fmt"
+	"strings"
+	"time"
+
+	core_types "github.com/cometbft/cometbft/rpc/core/types"
 	types2 "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	"github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -29,10 +34,6 @@ import (
 	"github.com/polynetwork/cosmos-relayer/log"
 	mcli "github.com/polynetwork/poly-go-sdk/client"
 	mtypes "github.com/polynetwork/poly/core/types"
-	mcosmos "github.com/polynetwork/poly/native/service/header_sync/cosmos"
-	core_types "github.com/tendermint/tendermint/rpc/core/types"
-	"strings"
-	"time"
 )
 
 func StartRelay() {
@@ -69,7 +70,7 @@ func ToPolyRoutine() {
 // Process cosmos-headers msg. This function would not return before our
 // Ploygon tx committing headers confirmed. This guarantee that the next
 // cross-chain txs next to relay can be proved on Poly.
-func handleCosmosHdrs(headers []*mcosmos.CosmosHeader) error {
+func handleCosmosHdrs(headers []*context.CosmosHeader) error {
 	if ctx.PolyStatus.Len() > 0 {
 		ctx.PolyStatus.IsBlocked = true
 		ctx.PolyStatus.CosmosEpochHeight = headers[0].Header.Height
@@ -77,7 +78,7 @@ func handleCosmosHdrs(headers []*mcosmos.CosmosHeader) error {
 		ctx.PolyStatus.Wg.Add(1)
 	}
 	for i := 0; i < len(headers); i += context.HdrLimitPerBatch {
-		var hdrs []*mcosmos.CosmosHeader
+		var hdrs []*context.CosmosHeader
 		if i+context.HdrLimitPerBatch > len(headers) {
 			hdrs = headers[i:]
 		} else {
@@ -139,7 +140,7 @@ func handleCosmosHdrs(headers []*mcosmos.CosmosHeader) error {
 }
 
 // Relay COSMOS cross-chain tx to polygon.
-func handleCosmosTx(tx *context.CosmosTx, hdr *mcosmos.CosmosHeader) {
+func handleCosmosTx(tx *context.CosmosTx, hdr *context.CosmosHeader) {
 	raw, err := ctx.CMCdc.MarshalBinaryBare(*hdr)
 	if err != nil {
 		panic(fmt.Errorf("failed to marshal cosmos header %s: %v", hdr.Commit.BlockID.Hash.String(), err))
@@ -227,11 +228,11 @@ func handlePolyHdr(hdr *mtypes.Header) {
 	hash := hdr.Hash()
 	var resTx *core_types.ResultTx
 	for range tick.C {
-		resTx, _ = ctx.CMRpcCli.Tx(res.Hash, false)
+		resTx, _ = ctx.CMRpcCli.Tx(goContext.Background(), res.Hash, false)
 		if resTx == nil {
 			continue
 		}
-		status, _ := ctx.CMRpcCli.Status()
+		status, _ := ctx.CMRpcCli.Status(goContext.Background())
 		if resTx.Height > 0 && status.SyncInfo.LatestBlockHeight > resTx.Height {
 			break
 		}
@@ -290,7 +291,7 @@ func sendCosmosTx(msgs []types2.Msg) (*core_types.ResultBroadcastTx, uint64, err
 	}
 	var res *core_types.ResultBroadcastTx
 	for {
-		res, err = ctx.CMRpcCli.BroadcastTxSync(rawTx)
+		res, err = ctx.CMRpcCli.BroadcastTxSync(goContext.Background(), rawTx)
 		if err != nil {
 			if strings.Contains(err.Error(), context.BroadcastConnTimeOut) {
 				context.SleepSecs(10)

@@ -18,6 +18,11 @@
 package db
 
 import (
+	"os"
+	"testing"
+
+	types2 "github.com/cometbft/cometbft/abci/types"
+	coretypes "github.com/cometbft/cometbft/rpc/core/types"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/auth"
@@ -29,11 +34,6 @@ import (
 	"github.com/polynetwork/cosmos-poly-module/lockproxy"
 	pt "github.com/polynetwork/poly/core/types"
 	"github.com/stretchr/testify/assert"
-	types2 "github.com/tendermint/tendermint/abci/types"
-	"github.com/tendermint/tendermint/libs/kv"
-	"github.com/tendermint/tendermint/rpc/core/types"
-	"os"
-	"testing"
 )
 
 var (
@@ -47,10 +47,10 @@ var (
 			Events: []types2.Event{
 				types2.Event{
 					Type: "gogogo",
-					Attributes: []kv.Pair{
-						kv.Pair{
-							Key:   []byte{1},
-							Value: []byte{2},
+					Attributes: []types2.EventAttribute{
+						types2.EventAttribute{
+							Key:   "1",
+							Value: "2",
 						},
 					},
 				},

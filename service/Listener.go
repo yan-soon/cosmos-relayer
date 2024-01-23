@@ -19,8 +19,15 @@ package service
 
 import (
 	"bytes"
+	gocontext "context"
 	"encoding/hex"
 	"fmt"
+	"strings"
+	"time"
+
+	"github.com/cometbft/cometbft/rpc/client"
+	coretypes "github.com/cometbft/cometbft/rpc/core/types"
+	tdmt_types "github.com/cometbft/cometbft/types"
 	"github.com/polynetwork/cosmos-poly-module/ccm"
 	"github.com/polynetwork/cosmos-poly-module/headersync"
 	"github.com/polynetwork/cosmos-relayer/context"
@@ -32,11 +39,6 @@ import (
 	"github.com/polynetwork/poly/native/service/header_sync/cosmos"
 	"github.com/polynetwork/poly/native/service/utils"
 	"github.com/tendermint/tendermint/crypto/merkle"
-	"github.com/tendermint/tendermint/rpc/client"
-	"github.com/tendermint/tendermint/rpc/core/types"
-	tdmt_types "github.com/tendermint/tendermint/types"
-	"strings"
-	"time"
 )
 
 var (
@@ -182,7 +184,7 @@ func checkPolyHeight(h, epochHeight uint32) (int, error) {
 				_ = merkleValue.Deserialization(common.NewZeroCopySource(val))
 
 				// check if this cross-chain tx already committed on COSMOS
-				res, err := ctx.CMRpcCli.ABCIQuery(context.ProofPath, ccm.GetDoneTxKey(merkleValue.FromChainID,
+				res, err := ctx.CMRpcCli.ABCIQuery(gocontext.Background(), context.ProofPath, ccm.GetDoneTxKey(merkleValue.FromChainID,
 					merkleValue.MakeTxParam.CrossChainID))
 				if err != nil || res == nil || res.Response.GetValue() != nil {
 					continue
@@ -278,7 +280,7 @@ func CosmosListen() {
 	for {
 		select {
 		case <-tick.C:
-			status, err := ctx.CMRpcCli.Status()
+			status, err := ctx.CMRpcCli.Status(gocontext.Background())
 			switch {
 			case err != nil:
 				log.Errorf("[ListenCosmos] failed to get height of COSMOS, retry after %d sec: %v",
@@ -304,7 +306,7 @@ func CosmosListen() {
 			infoArr := make([]*context.CosmosInfo, 1)
 			infoArr[0] = &context.CosmosInfo{
 				Type: context.TyHeader,
-				Hdrs: make([]*cosmos.CosmosHeader, 0),
+				Hdrs: make([]*context.CosmosHeader, 0),
 			}
 			for h := left + 1; h <= right; h++ {
 				infoArrTemp, err := checkCosmosHeight(h, hdr, infoArr, &right)
@@ -382,14 +384,16 @@ func beforeCosmosListen() (int64, *time.Ticker, error) {
 // Put header to `hdrArr` and txs to `txArr`. Get proof from height `heightToGetProof`.
 // `headersToRelay` record all hdrs need to relay. When need to update new height to
 // get proof, relayer update `rightPtr` and return.
-func checkCosmosHeight(h int64, hdrToVerifyProof *cosmos.CosmosHeader, infoArr []*context.CosmosInfo, rightPtr *int64) ([]*context.CosmosInfo, error) {
+func checkCosmosHeight(h int64, hdrToVerifyProof *context.CosmosHeader, infoArr []*context.CosmosInfo, rightPtr *int64) ([]*context.CosmosInfo, error) {
 	query := getTxQuery(h - 1)
-	res, err := ctx.CMRpcCli.TxSearch(query, true, 1, context.PerPage, "asc")
+	page := 1
+	perPage := context.PerPage
+	res, err := ctx.CMRpcCli.TxSearch(gocontext.Background(), query, true, &page, &perPage, "asc")
 	if err != nil {
 		return infoArr, err
 	}
 
-	rc, err := ctx.CMRpcCli.Commit(&h)
+	rc, err := ctx.CMRpcCli.Commit(gocontext.Background(), &h)
 	if err != nil {
 		return infoArr, err
 	}
@@ -398,7 +402,7 @@ func checkCosmosHeight(h int64, hdrToVerifyProof *cosmos.CosmosHeader, infoArr [
 		if err != nil {
 			return infoArr, err
 		}
-		hdr := &cosmos.CosmosHeader{
+		hdr := &context.CosmosHeader{
 			Header:  *rc.Header,
 			Commit:  rc.Commit,
 			Valsets: vSet,
@@ -421,14 +425,14 @@ func checkCosmosHeight(h int64, hdrToVerifyProof *cosmos.CosmosHeader, infoArr [
 	for p := 1; p <= pages; p++ {
 		// already have page 1
 		if p > 1 {
-			if res, err = ctx.CMRpcCli.TxSearch(query, true, p, context.PerPage, "asc"); err != nil {
+			if res, err = ctx.CMRpcCli.TxSearch(gocontext.Background(), query, true, &p, &perPage, "asc"); err != nil {
 				return infoArr, err
 			}
 		}
 		// get proof for every tx, and add them to txArr prepared to commit
 		for _, tx := range res.Txs {
 			hash := getKeyHash(tx)
-			res, _ := ctx.CMRpcCli.ABCIQueryWithOptions(context.ProofPath, ccm.GetCrossChainTxKey(hash),
+			res, _ := ctx.CMRpcCli.ABCIQueryWithOptions(gocontext.Background(), context.ProofPath, ccm.GetCrossChainTxKey(hash),
 				client.ABCIQueryOptions{Prove: true, Height: heightToGetProof})
 			if res == nil || res.Response.GetValue() == nil {
 				// If get the proof failed, that could means the header of height `heightToGetProof`
@@ -436,7 +440,7 @@ func checkCosmosHeight(h int64, hdrToVerifyProof *cosmos.CosmosHeader, infoArr [
 				// `heightToGetProof`. We need to update the height `right`, and check this height
 				// `h` again
 				for {
-					status, err := ctx.CMRpcCli.Status()
+					status, err := ctx.CMRpcCli.Status(gocontext.Background())
 					if err != nil {
 						log.Errorf("failed to get status and could be something wrong with RPC: %v", err)
 						continue
@@ -454,7 +458,7 @@ func checkCosmosHeight(h int64, hdrToVerifyProof *cosmos.CosmosHeader, infoArr [
 				}
 				return infoArr, fmt.Errorf("%s from %d to %d", context.RightHeightUpdate, heightToGetProof+1, *rightPtr)
 			}
-			proof, _ := res.Response.Proof.Marshal()
+			proof, _ := res.Response.GetProofOps().Marshal()
 
 			kp := merkle.KeyPath{}
 			kp = kp.AppendKey([]byte(context.CosmosCrossChainModName), merkle.KeyEncodingURL)
@@ -486,7 +490,7 @@ func checkCosmosHeight(h int64, hdrToVerifyProof *cosmos.CosmosHeader, infoArr [
 					Proof:       proof,
 					PVal:        pv,
 				},
-				Hdrs: []*cosmos.CosmosHeader{hdrToVerifyProof},
+				Hdrs: []*context.CosmosHeader{hdrToVerifyProof},
 			})
 		}
 	}
@@ -494,7 +498,7 @@ func checkCosmosHeight(h int64, hdrToVerifyProof *cosmos.CosmosHeader, infoArr [
 	return infoArr, nil
 }
 
-func reproveCosmosTx(infoArr []*context.CosmosInfo, hdrToVerifyProof *cosmos.CosmosHeader) []*context.CosmosInfo {
+func reproveCosmosTx(infoArr []*context.CosmosInfo, hdrToVerifyProof *context.CosmosHeader) []*context.CosmosInfo {
 	arr, err := ctx.Db.GetCosmosTxReproving()
 	if err != nil {
 		panic(fmt.Errorf("[ReProve] failed to get reproving cosmos tx: %v", err))
@@ -507,7 +511,7 @@ func reproveCosmosTx(infoArr []*context.CosmosInfo, hdrToVerifyProof *cosmos.Cos
 	for i := 0; i < len(arr); i++ {
 		tx := arr[i]
 		hash := getKeyHash(tx)
-		res, err := ctx.CMRpcCli.ABCIQueryWithOptions(context.ProofPath, ccm.GetCrossChainTxKey(hash),
+		res, err := ctx.CMRpcCli.ABCIQueryWithOptions(gocontext.Background(), context.ProofPath, ccm.GetCrossChainTxKey(hash),
 			client.ABCIQueryOptions{Prove: true, Height: hdrToVerifyProof.Header.Height - 1})
 		if err != nil || res == nil || res.Response.GetValue() == nil {
 			log.Errorf("[ReProve] failed to query proof and could be something wrong with RPC: %v", err)
@@ -522,7 +526,7 @@ func reproveCosmosTx(infoArr []*context.CosmosInfo, hdrToVerifyProof *cosmos.Cos
 			Value: res.Response.GetValue(),
 		})
 
-		proof, _ := res.Response.GetProof().Marshal()
+		proof, _ := res.Response.GetProofOps().Marshal()
 		log.Debugf("[ReProve] repove cosmos tx %s with height %d and header %d",
 			tx.Hash.String(), res.Response.Height, hdrToVerifyProof.Header.Height)
 
@@ -545,7 +549,7 @@ func reproveCosmosTx(infoArr []*context.CosmosInfo, hdrToVerifyProof *cosmos.Cos
 				Proof:       proof,
 				PVal:        pv,
 			},
-			Hdrs: []*cosmos.CosmosHeader{hdrToVerifyProof},
+			Hdrs: []*context.CosmosHeader{hdrToVerifyProof},
 		})
 		ctx.Db.SetCosmosTxTxInChan(tx.Hash)
 	}
@@ -559,8 +563,9 @@ func getTxQuery(h int64) string {
 func getValidators(h int64) ([]*tdmt_types.Validator, error) {
 	p := 1
 	vSet := make([]*tdmt_types.Validator, 0)
+	perPage := context.PerPage
 	for {
-		res, err := ctx.CMRpcCli.Validators(&h, p, 100)
+		res, err := ctx.CMRpcCli.Validators(gocontext.Background(), &h, &p, &perPage)
 		if err != nil {
 			if strings.Contains(err.Error(), "page should be within") {
 				return vSet, nil
@@ -576,8 +581,8 @@ func getValidators(h int64) ([]*tdmt_types.Validator, error) {
 	}
 }
 
-func getCosmosHdr(h int64) (*cosmos.CosmosHeader, error) {
-	rc, err := ctx.CMRpcCli.Commit(&h)
+func getCosmosHdr(h int64) (*context.CosmosHeader, error) {
+	rc, err := ctx.CMRpcCli.Commit(gocontext.Background(), &h)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Commit of height %d: %v", h, err)
 	}
@@ -585,7 +590,7 @@ func getCosmosHdr(h int64) (*cosmos.CosmosHeader, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Validators of height %d: %v", h, err)
 	}
-	return &cosmos.CosmosHeader{
+	return &context.CosmosHeader{
 		Header:  *rc.Header,
 		Commit:  rc.Commit,
 		Valsets: vSet,
@@ -597,7 +602,7 @@ func getPolyEpochOnCosmos() (*headersync.ConsensusPeers, error) {
 	if err != nil {
 		return nil, err
 	}
-	res, err := ctx.CMRpcCli.ABCIQuery(context.QueryConsensusPath, data)
+	res, err := ctx.CMRpcCli.ABCIQuery(gocontext.Background(), context.QueryConsensusPath, data)
 	if err != nil {
 		return nil, err
 	}
