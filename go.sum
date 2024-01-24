@@ -936,8 +936,8 @@ github.com/Switcheo/cosmos-sdk v0.47.5-0.20240119065259-675e01adc46f h1:fNXmTre5
 github.com/Switcheo/cosmos-sdk v0.47.5-0.20240119065259-675e01adc46f/go.mod h1:M6PXSqizJZMQrx3F6MPo9lhfho4hUfFrVBfcf+1bzBs=
 github.com/Switcheo/poly v0.0.0-20240123071231-ca0ffcaf031c h1:5QhjOEbtzAFypy6ln1g2dcD8t6wB9qnsVBDBAxNmQQc=
 github.com/Switcheo/poly v0.0.0-20240123071231-ca0ffcaf031c/go.mod h1:UowWUaDjYsJab9kdc5g5zqSprCDscH+pmsmbJJC3g84=
-github.com/Switcheo/polynetwork-cosmos v0.0.0-20240123083152-f47ec6b689de h1:UajBG5DIZpJfcmFKroavuE+AAl48CNou6LTKZe7Zk0I=
-github.com/Switcheo/polynetwork-cosmos v0.0.0-20240123083152-f47ec6b689de/go.mod h1:Jbqi942NoF4lBXKrGRc5uoDytZmtKHsUs+Tk08m4CCk=
+github.com/Switcheo/polynetwork-cosmos v0.0.0-20240124090553-72d8c37c7418 h1:XX6Jthk6DFjdszfySdmp7wgP23C+4qc02K0ryc87LPc=
+github.com/Switcheo/polynetwork-cosmos v0.0.0-20240124090553-72d8c37c7418/go.mod h1:Jbqi942NoF4lBXKrGRc5uoDytZmtKHsUs+Tk08m4CCk=
 github.com/VictoriaMetrics/fastcache v1.5.3/go.mod h1:+jv9Ckb+za/P1ZRg/sulP5Ni1v49daAVERr0H3CuscE=
 github.com/VictoriaMetrics/fastcache v1.5.7 h1:4y6y0G8PRzszQUYIQHHssv/jgPHAb5qQuuDNdCbyAgw=
 github.com/VictoriaMetrics/fastcache v1.5.7/go.mod h1:ptDBkNMQI4RtmVo8VS/XwRY6RoTu1dAWCbrk+6WsEM8=
