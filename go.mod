@@ -3,7 +3,7 @@ module github.com/polynetwork/cosmos-relayer
 go 1.16
 
 require (
-	github.com/Switcheo/polynetwork-cosmos v0.0.0-20220405083937-082c1556eb65
+	github.com/Switcheo/polynetwork-cosmos v0.0.0-20240123083152-f47ec6b689de
 	github.com/boltdb/bolt v1.3.1
 	github.com/cometbft/cometbft v0.37.2
 	github.com/cosmos/cosmos-sdk v0.47.5
@@ -19,10 +19,8 @@ replace github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alp
 
 replace github.com/cosmos/cosmos-sdk => github.com/Switcheo/cosmos-sdk v0.47.5-0.20240119065259-675e01adc46f
 
-replace github.com/polynetwork/poly => github.com/yan-soon/poly v0.0.0-20240123071231-ca0ffcaf031c
+replace github.com/polynetwork/poly => github.com/Switcheo/poly v0.0.0-20240123071231-ca0ffcaf031c
 
 replace github.com/btcsuite/btcd => github.com/btcsuite/btcd v0.22.2
-
-replace github.com/Switcheo/polynetwork-cosmos => github.com/yan-soon/polynetwork-cosmos v0.0.0-20240123083152-f47ec6b689de
 
 replace github.com/ontio/ontology-crypto => github.com/ontio/ontology-crypto v1.2.1
